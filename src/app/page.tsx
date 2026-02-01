@@ -7,6 +7,7 @@ import { KpiGrid } from '@/components/dashboard/KpiGrid';
 import { ComparisonGrid } from '@/components/dashboard/ComparisonGrid';
 import { DividendTable } from '@/components/dashboard/DividendTable';
 import { TransactionTimeline } from '@/components/dashboard/TransactionTimeline';
+import { YearlyDetailTable } from '@/components/dashboard/YearlyDetailTable';
 import { PriceChart, YearlyPerformanceChart, DividendBreakdown } from '@/components/Charts';
 import { GlassCard } from '@/components/ui/glass';
 import { calculateInvestment } from '@/lib/investment-calculator';
@@ -245,49 +246,61 @@ export default function DashboardPage() {
 
             {/* Charts Area */}
             {result ? (
-              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 pb-10">
-                {/* Main Chart */}
-                <div className="xl:col-span-8 h-full">
-                  <GlassCard className="h-full p-1" delay={0.2}>
-                    <div className="p-4 border-b border-white/5 bg-white/[0.02]">
-                      <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                        Hiệu Suất Tài Sản
-                      </h3>
-                    </div>
-                    <div className="p-4 h-[500px]">
-                      <PriceChart data={priceData} height={460} />
-                    </div>
-                  </GlassCard>
-                </div>
+              <>
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 pb-10">
+                  {/* Main Chart */}
+                  <div className="xl:col-span-8 h-full">
+                    <GlassCard className="h-full p-1" delay={0.2}>
+                      <div className="p-4 border-b border-white/5 bg-white/[0.02]">
+                        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                          Hiệu Suất Tài Sản
+                        </h3>
+                      </div>
+                      <div className="p-4 h-[500px]">
+                        <PriceChart data={priceData} height={460} />
+                      </div>
+                    </GlassCard>
+                  </div>
 
-                {/* Side Charts */}
-                <div className="xl:col-span-4 space-y-6">
-                  <div className="min-h-[280px]">
-                    <DividendBreakdown
-                      cashDividends={result.dividendsCashReceived}
-                      stockDividends={result.dividendsStockReceived}
-                      reinvested={result.dividendsReinvested}
+                  {/* Side Charts */}
+                  <div className="xl:col-span-4 space-y-6">
+                    <div className="min-h-[280px]">
+                      <DividendBreakdown
+                        cashDividends={result.dividendsCashReceived}
+                        stockDividends={result.dividendsStockReceived}
+                        reinvested={result.dividendsReinvested}
+                      />
+                    </div>
+
+                    {/* Dividend Table History */}
+                    <div>
+                      <DividendTable dividends={dividendData} symbol={result.symbol} />
+                    </div>
+
+                    {/* Transaction Timeline - Expandable */}
+                    <TransactionTimeline
+                      timeline={result.timeline}
+                      symbol={result.symbol}
                     />
-                  </div>
 
-                  {/* Dividend Table History */}
-                  <div>
-                    <DividendTable dividends={dividendData} symbol={result.symbol} />
-                  </div>
-
-                  {/* Transaction Timeline - Expandable */}
-                  <TransactionTimeline
-                    timeline={result.timeline}
-                    symbol={result.symbol}
-                  />
-
-                  <div className="h-[200px]">
-                    <YearlyPerformanceChart data={result.yearlyPerformance} height={140} />
+                    <div className="h-[200px]">
+                      <YearlyPerformanceChart data={result.yearlyPerformance} height={140} />
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                {/* Yearly Detail Table - Full Width */}
+                <div className="pb-10">
+                  <YearlyDetailTable
+                    timeline={result.timeline}
+                    compareTimeline={compareResult?.timeline}
+                    symbol={result.symbol}
+                    compareSymbol={compareResult?.symbol}
+                    initialInvestment={formData.initialAmount}
+                  />
+                </div>
+              </>
             ) : (
-              /* Empty State - Hero Section */
               <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 animate-in fade-in zoom-in duration-1000">
                 <div className="relative group cursor-default">
                   <div className="absolute inset-0 bg-indigo-500/30 blur-[100px] rounded-full group-hover:bg-indigo-500/40 transition-all duration-1000" />
@@ -314,7 +327,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-      </main>
-    </div>
+      </main >
+    </div >
   );
 }
