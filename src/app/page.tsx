@@ -6,6 +6,7 @@ import { ControlBar } from '@/components/dashboard/ControlBar';
 import { KpiGrid } from '@/components/dashboard/KpiGrid';
 import { ComparisonGrid } from '@/components/dashboard/ComparisonGrid';
 import { DividendTable } from '@/components/dashboard/DividendTable';
+import { TransactionTimeline } from '@/components/dashboard/TransactionTimeline';
 import { PriceChart, YearlyPerformanceChart, DividendBreakdown } from '@/components/Charts';
 import { GlassCard } from '@/components/ui/glass';
 import { calculateInvestment } from '@/lib/investment-calculator';
@@ -270,6 +271,13 @@ export default function DashboardPage() {
                   <div>
                     <DividendTable dividends={dividendData} symbol={result.symbol} />
                   </div>
+
+                  {/* Transaction Timeline - Expandable */}
+                  <TransactionTimeline
+                    timeline={result.timeline}
+                    symbol={result.symbol}
+                  />
+
                   <div className="h-[200px]">
                     <YearlyPerformanceChart data={result.yearlyPerformance} height={140} />
                   </div>
