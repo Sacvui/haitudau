@@ -246,7 +246,7 @@ export default function DashboardPage() {
 
                 {/* Side Charts */}
                 <div className="xl:col-span-4 space-y-6">
-                  <div className="h-[280px]">
+                  <div className="min-h-[280px]">
                     <DividendBreakdown
                       cashDividends={result.dividendsCashReceived}
                       stockDividends={result.dividendsStockReceived}

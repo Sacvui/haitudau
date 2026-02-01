@@ -96,7 +96,7 @@ export function DividendTable({ dividends, symbol }: DividendTableProps) {
                                     <td className="p-4 text-right">
                                         {data.cash > 0 ? (
                                             <span className="font-mono text-emerald-400 font-bold text-sm">
-                                                {formatCurrency(data.cash)}
+                                                {new Intl.NumberFormat('vi-VN').format(data.cash)} <span className="text-xs text-slate-400">đ</span>
                                             </span>
                                         ) : (
                                             <span className="text-slate-500">-</span>
@@ -142,6 +142,6 @@ export function DividendTable({ dividends, symbol }: DividendTableProps) {
                     </tfoot>
                 </table>
             </div>
-        </GlassCard>
+        </GlassCard >
     );
 }
