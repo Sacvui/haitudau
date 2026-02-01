@@ -97,9 +97,46 @@ export function calculateInvestment(
     const monthlyDCA = input.monthlyInvestment || 0;
     const shouldReinvest = input.reinvestDividends !== false; // Default true
 
+    // IMPORTANT: Calculate cumulative adjustment factor for each date
+    // Stock dividends cause price adjustment. We need to "unadjust" the price
+    // to get the real price at purchase time.
+    // 
+    // For each stock dividend event (e.g., 40%), prices BEFORE that date are
+    // multiplied by 1/(1+0.40) = 0.714 in adjusted data.
+    // To get unadjusted price: adjustedPrice * cumulativeAdjustmentFactor
+
+    const stockDividends = sortedDividends.filter(d => d.type === 'stock');
+
+    // Build adjustment factor map: for each date, what's the cumulative factor
+    const getAdjustmentFactor = (date: Date): number => {
+        let factor = 1.0;
+        // For prices BEFORE a stock dividend, they were adjusted DOWN
+        // So to get original price, we need to multiply by factor
+        for (const sd of stockDividends) {
+            const sdDate = new Date(sd.exDate);
+            if (date < sdDate) {
+                // This price was adjusted for this dividend
+                factor *= (1 + sd.value / 100);
+            }
+        }
+        return factor;
+    };
+
     // 3. Find Start Index
     const firstPriceIdx = sortedPrices.findIndex(p => new Date(p.date) >= startDateObj);
     if (firstPriceIdx === -1) throw new Error('Không tìm thấy dữ liệu giá');
+
+    // Calculate unadjusted prices for all data points
+    const unadjustedPrices = sortedPrices.map(p => {
+        const factor = getAdjustmentFactor(new Date(p.date));
+        return {
+            ...p,
+            close: Math.round(p.close * factor), // Unadjust the price
+            open: Math.round(p.open * factor),
+            high: Math.round(p.high * factor),
+            low: Math.round(p.low * factor),
+        };
+    });
 
     let lastMonth = -1;
 
@@ -137,13 +174,13 @@ export function calculateInvestment(
         }
     };
 
-    // 4. Initial Buy
-    const firstPrice = sortedPrices[firstPriceIdx];
+    // 4. Initial Buy - Use unadjusted price
+    const firstPrice = unadjustedPrices[firstPriceIdx];
     buyShares(firstPrice.date, firstPrice.close, cashBalance, "Mua lần đầu");
 
-    // 5. Main Loop
-    for (let i = firstPriceIdx; i < sortedPrices.length; i++) {
-        const price = sortedPrices[i];
+    // 5. Main Loop - Use unadjusted prices for all calculations
+    for (let i = firstPriceIdx; i < unadjustedPrices.length; i++) {
+        const price = unadjustedPrices[i];
         const priceDate = new Date(price.date);
 
         if (priceDate > endDateObj) break;
@@ -233,11 +270,11 @@ export function calculateInvestment(
         }
     }
 
-    // 6. Final Calculation
-    const lastPrice = sortedPrices[Math.min(sortedPrices.length - 1, sortedPrices.findIndex(p => new Date(p.date) > endDateObj) === -1 ? sortedPrices.length - 1 : sortedPrices.findIndex(p => new Date(p.date) > endDateObj) - 1)];
+    // 6. Final Calculation - Use unadjusted prices
+    const lastPrice = unadjustedPrices[Math.min(unadjustedPrices.length - 1, unadjustedPrices.findIndex(p => new Date(p.date) > endDateObj) === -1 ? unadjustedPrices.length - 1 : unadjustedPrices.findIndex(p => new Date(p.date) > endDateObj) - 1)];
 
     // Nếu lastPrice bị undefined do logic findIndex
-    const finalPrice = lastPrice ? lastPrice : sortedPrices[sortedPrices.length - 1];
+    const finalPrice = lastPrice ? lastPrice : unadjustedPrices[unadjustedPrices.length - 1];
 
     const finalPortfolioValue = (totalShares * finalPrice.close) + cashBalance;
     const absoluteReturn = finalPortfolioValue - totalInvested;
