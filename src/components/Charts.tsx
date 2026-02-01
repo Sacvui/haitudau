@@ -45,24 +45,27 @@ interface AssetGrowthChartProps {
     height?: number;
 }
 
-export function PriceChart({ data, height = 350 }: AssetGrowthChartProps) {
+export function PriceChart({ data, timeline, height = 350 }: AssetGrowthChartProps) {
+    // Check if data contains portfolio values (large numbers > 1M) or stock prices (< 1M)
+    const isPortfolioData = data.length > 0 && data[0].close > 1000000;
+
     const chartData = data.map((d) => ({
         ...d,
         date: format(new Date(d.date), 'dd/MM/yy'),
-        priceK: d.close / 1000, // Đơn vị Nghìn đồng (hoặc Triệu nếu số lớn, nhưng tạm để K theo giá CP)
-        // Nếu d.close là Tổng tài sản (Portfolio Value), thì chia 1e6 để ra Triệu
-        // Tuy nhiên hiện tại page.tsx đang truyền Price (Giá CP). 
-        // Để đúng logic Asset Growth, ta nên map Price -> Portfolio Value bên ngoài.
-        // Nhưng tạm thời vẽ Price (đơn vị K) để demo visual.
-        savingsK: d.savingsValue ? d.savingsValue / 1000 : null,
+        // If portfolio value, show in Millions. If stock price, show in thousands
+        valueM: isPortfolioData ? d.close / 1e6 : d.close / 1000,
+        savingsM: d.savingsValue ? d.savingsValue / 1e6 : null,
     }));
 
-    // Calculate insights based on STOCK PRICE (for now)
-    const prices = data.map(d => d.close);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-    const priceChange = ((data[data.length - 1].close - data[0].close) / data[0].close * 100);
+    // Find dividend events from timeline to mark on chart
+    const dividendEvents = timeline?.filter(e => e.type === 'dividend_cash' || e.type === 'dividend_stock') || [];
+
+    // Calculate insights
+    const values = data.map(d => d.close);
+    const startValue = values[0] || 0;
+    const endValue = values[values.length - 1] || 0;
+    const valueChange = startValue > 0 ? ((endValue - startValue) / startValue * 100) : 0;
+    const unit = isPortfolioData ? 'Triệu' : 'K';
 
     return (
         <Card className="bg-[#111827] border-slate-800 shadow-xl overflow-hidden">
@@ -71,16 +74,22 @@ export function PriceChart({ data, height = 350 }: AssetGrowthChartProps) {
                     <div>
                         <CardTitle className="text-sm flex items-center gap-2 text-slate-200">
                             <TrendingUp className="w-4 h-4 text-emerald-400" />
-                            TĂNG TRƯỞNG TÀI SẢN
+                            {isPortfolioData ? 'GIÁ TRỊ DANH MỤC' : 'TĂNG TRƯỞNG TÀI SẢN'}
                         </CardTitle>
                         <CardDescription className="text-xs mt-1 text-slate-500">
-                            So sánh: Đầu tư Cổ phiếu (Xanh) vs Gửi Tiết kiệm (Xám)
+                            {isPortfolioData
+                                ? `Từ ${(startValue / 1e6).toFixed(0)}M → ${(endValue / 1e6).toFixed(0)}M VND`
+                                : 'So sánh: Đầu tư Cổ phiếu (Xanh) vs Gửi Tiết kiệm (Xám)'
+                            }
+                            {dividendEvents.length > 0 && (
+                                <span className="ml-2 text-amber-400">• {dividendEvents.length} lần chia cổ tức</span>
+                            )}
                         </CardDescription>
                     </div>
                     <div className="flex gap-2">
-                        <Badge variant="outline" className={`text-xs border-slate-700 ${priceChange >= 0 ? "text-emerald-400 bg-emerald-400/10" : "text-rose-400 bg-rose-400/10"}`}>
-                            {priceChange >= 0 ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                            {Math.abs(priceChange).toFixed(2)}%
+                        <Badge variant="outline" className={`text-xs border-slate-700 ${valueChange >= 0 ? "text-emerald-400 bg-emerald-400/10" : "text-rose-400 bg-rose-400/10"}`}>
+                            {valueChange >= 0 ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                            {Math.abs(valueChange).toFixed(2)}%
                         </Badge>
                     </div>
                 </div>
@@ -116,7 +125,7 @@ export function PriceChart({ data, height = 350 }: AssetGrowthChartProps) {
                                 tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 500 }}
                                 tickLine={false}
                                 axisLine={false}
-                                tickFormatter={(val) => `${val.toFixed(0)}K`}
+                                tickFormatter={(val) => isPortfolioData ? `${val.toFixed(0)}M` : `${val.toFixed(0)}K`}
                                 domain={['auto', 'auto']}
                                 dx={10}
                             />
@@ -134,21 +143,22 @@ export function PriceChart({ data, height = 350 }: AssetGrowthChartProps) {
                                 cursor={{ stroke: '#8b5cf6', strokeWidth: 1, strokeDasharray: '4 4' }}
                                 formatter={(value: any, name: any) => {
                                     const valNum = Number(value);
-                                    if (name === 'savingsK') return [`${valNum.toLocaleString()}K`, 'Gửi Tiết Kiệm'];
-                                    return [`${valNum.toLocaleString()}K`, 'Giá Vốn CP'];
+                                    const unitLabel = isPortfolioData ? 'Triệu VND' : 'K';
+                                    if (name === 'savingsM') return [`${valNum.toLocaleString()} ${unitLabel}`, 'Gửi Tiết Kiệm'];
+                                    return [`${valNum.toLocaleString()} ${unitLabel}`, isPortfolioData ? 'Giá Trị DM' : 'Giá CP'];
                                 }}
                                 labelStyle={{ marginBottom: '8px', color: '#cbd5e1', fontWeight: 600 }}
                             />
 
-                            {/* Area: Stock Investment - NEON STYLE */}
+                            {/* Area: Portfolio/Stock Value - NEON STYLE */}
                             <Area
                                 type="monotone"
-                                dataKey="priceK"
+                                dataKey="valueM"
                                 stroke="#8b5cf6"
                                 strokeWidth={3}
                                 fillOpacity={1}
                                 fill="url(#colorPrice)"
-                                name="priceK"
+                                name="valueM"
                                 filter="url(#glow)"
                                 activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2, filter: 'url(#glow)' }}
                             />
@@ -156,12 +166,12 @@ export function PriceChart({ data, height = 350 }: AssetGrowthChartProps) {
                             {/* Line: Savings Benchmark */}
                             <Line
                                 type="monotone"
-                                dataKey="savingsK"
+                                dataKey="savingsM"
                                 stroke="#64748b"
                                 strokeWidth={2}
                                 strokeDasharray="6 6"
                                 dot={false}
-                                name="savingsK"
+                                name="savingsM"
                                 opacity={0.6}
                             />
 
