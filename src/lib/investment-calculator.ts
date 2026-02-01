@@ -196,8 +196,8 @@ export function calculateInvestment(
                     date: price.date,
                     type: 'dividend_cash',
                     description: desc,
-                    shares: 0,
-                    pricePerShare: 0,
+                    shares: totalShares, // Số CP hiện có
+                    pricePerShare: dividend.value * (1 - TAX_RATE_DIVIDEND), // Cổ tức/CP sau thuế
                     totalShares,
                     portfolioValue: (totalShares * price.close) + cashBalance,
                     cashBalance
