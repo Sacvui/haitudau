@@ -209,24 +209,21 @@ export function calculateInvestment(
 
             } else {
                 // Stock Dividend (Bonus Shares)
-                // QUAN TRỌNG: Khi dùng adjusted price (giá đã điều chỉnh theo sự kiện),
-                // KHÔNG cộng thêm cổ phiếu thưởng vào số lượng sở hữu vì giá đã phản ánh điều này.
-                // Chỉ ghi nhận GIÁ TRỊ để hiển thị.
+                // Tính số cổ phiếu thưởng dựa trên tỷ lệ
+                const bonusShares = Math.floor(totalShares * (dividend.value / 100));
+                const bonusValue = bonusShares * price.close;
 
-                // Giá trị ước tính của cổ tức cổ phiếu (dựa trên số cổ phiếu hiện có * tỷ lệ * giá hiện tại)
-                const theoreticalBonusShares = Math.floor(totalShares * (dividend.value / 100));
-                const bonusValue = theoreticalBonusShares * price.close;
-
-                // Ghi nhận giá trị (không cộng vào totalShares vì adjusted price đã bao gồm)
-                dividendsStockReceived += bonusValue; // Lưu giá trị VND thay vì số cổ phiếu
+                // CỘNG CỔ PHIẾU THƯỞNG VÀO SỐ LƯỢNG
+                totalShares += bonusShares;
+                dividendsStockReceived += bonusValue;
 
                 timeline.push({
                     date: price.date,
                     type: 'dividend_stock',
-                    description: `Cổ tức CP ${dividend.value}% (≈${bonusValue.toLocaleString()}đ - đã phản ánh trong giá)`,
-                    shares: theoreticalBonusShares,
+                    description: `Cổ tức CP ${dividend.value}%: +${bonusShares.toLocaleString()} CP`,
+                    shares: bonusShares,
                     pricePerShare: price.close,
-                    totalShares, // Giữ nguyên, không cộng thêm
+                    totalShares, // Đã cộng thêm
                     portfolioValue: (totalShares * price.close) + cashBalance,
                     cashBalance
                 });
