@@ -33,150 +33,44 @@ interface StockDividendData {
     consistencyScore: number; // 1-5 stars, based on dividend consistency
 }
 
-// Sample data - In production, this would come from API
-const SAMPLE_STOCKS: StockDividendData[] = [
-    {
-        symbol: 'VIB',
-        name: 'Ngân hàng TMCP Quốc tế',
-        currentPrice: 24500,
-        dividendPerShare: 500,
-        dividendYield: 2.04,
-        dividendHistory: [
-            { year: 2023, dividend: 500, yield: 2.1 },
-            { year: 2022, dividend: 400, yield: 1.8 },
-            { year: 2021, dividend: 300, yield: 1.5 },
-        ],
-        stockDividendRatio: 0.15,
-        payoutFrequency: 'Annually',
-        sector: 'Ngân hàng',
-        marketCap: 55000e9,
-        consistencyScore: 4,
-    },
-    {
-        symbol: 'FPT',
-        name: 'Tập đoàn FPT',
-        currentPrice: 125000,
-        dividendPerShare: 2500,
-        dividendYield: 2.0,
-        dividendHistory: [
-            { year: 2023, dividend: 2500, yield: 2.1 },
-            { year: 2022, dividend: 2000, yield: 1.9 },
-            { year: 2021, dividend: 1800, yield: 1.7 },
-        ],
-        stockDividendRatio: 0.10,
-        payoutFrequency: 'Semi-annually',
-        sector: 'Công nghệ',
-        marketCap: 150000e9,
-        consistencyScore: 5,
-    },
-    {
-        symbol: 'VNM',
-        name: 'Vinamilk',
-        currentPrice: 72000,
-        dividendPerShare: 3500,
-        dividendYield: 4.86,
-        dividendHistory: [
-            { year: 2023, dividend: 3500, yield: 4.9 },
-            { year: 2022, dividend: 3800, yield: 5.2 },
-            { year: 2021, dividend: 4000, yield: 5.5 },
-        ],
-        stockDividendRatio: 0,
-        payoutFrequency: 'Quarterly',
-        sector: 'Tiêu dùng',
-        marketCap: 145000e9,
-        consistencyScore: 5,
-    },
-    {
-        symbol: 'HPG',
-        name: 'Tập đoàn Hòa Phát',
-        currentPrice: 28000,
-        dividendPerShare: 500,
-        dividendYield: 1.78,
-        dividendHistory: [
-            { year: 2023, dividend: 500, yield: 1.8 },
-            { year: 2022, dividend: 1000, yield: 3.2 },
-            { year: 2021, dividend: 2500, yield: 5.0 },
-        ],
-        stockDividendRatio: 0.05,
-        payoutFrequency: 'Annually',
-        sector: 'Thép',
-        marketCap: 130000e9,
-        consistencyScore: 3,
-    },
-    {
-        symbol: 'MBB',
-        name: 'Ngân hàng Quân đội',
-        currentPrice: 21500,
-        dividendPerShare: 800,
-        dividendYield: 3.72,
-        dividendHistory: [
-            { year: 2023, dividend: 800, yield: 3.7 },
-            { year: 2022, dividend: 600, yield: 2.9 },
-            { year: 2021, dividend: 500, yield: 2.5 },
-        ],
-        stockDividendRatio: 0.20,
-        payoutFrequency: 'Annually',
-        sector: 'Ngân hàng',
-        marketCap: 95000e9,
-        consistencyScore: 4,
-    },
-    {
-        symbol: 'VCB',
-        name: 'Vietcombank',
-        currentPrice: 92000,
-        dividendPerShare: 1800,
-        dividendYield: 1.96,
-        dividendHistory: [
-            { year: 2023, dividend: 1800, yield: 2.0 },
-            { year: 2022, dividend: 1500, yield: 1.7 },
-            { year: 2021, dividend: 1200, yield: 1.4 },
-        ],
-        stockDividendRatio: 0.30,
-        payoutFrequency: 'Annually',
-        sector: 'Ngân hàng',
-        marketCap: 450000e9,
-        consistencyScore: 5,
-    },
-    {
-        symbol: 'DGC',
-        name: 'Hóa chất Đức Giang',
-        currentPrice: 85000,
-        dividendPerShare: 6000,
-        dividendYield: 7.06,
-        dividendHistory: [
-            { year: 2023, dividend: 6000, yield: 7.1 },
-            { year: 2022, dividend: 8000, yield: 9.0 },
-            { year: 2021, dividend: 4000, yield: 5.0 },
-        ],
-        stockDividendRatio: 0,
-        payoutFrequency: 'Semi-annually',
-        sector: 'Hóa chất',
-        marketCap: 45000e9,
-        consistencyScore: 4,
-    },
-    {
-        symbol: 'PNJ',
-        name: 'Vàng bạc đá quý Phú Nhuận',
-        currentPrice: 105000,
-        dividendPerShare: 3000,
-        dividendYield: 2.86,
-        dividendHistory: [
-            { year: 2023, dividend: 3000, yield: 2.9 },
-            { year: 2022, dividend: 2800, yield: 2.7 },
-            { year: 2021, dividend: 2500, yield: 2.5 },
-        ],
-        stockDividendRatio: 0.05,
-        payoutFrequency: 'Annually',
-        sector: 'Bán lẻ',
-        marketCap: 35000e9,
-        consistencyScore: 5,
-    },
+// VN30 Dividend Data - Updated 2024
+const VN30_STOCKS: StockDividendData[] = [
+    { symbol: 'GAS', name: 'PV GAS', currentPrice: 85000, dividendPerShare: 4000, dividendYield: 4.71, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Dầu khí', marketCap: 165000e9, consistencyScore: 5 },
+    { symbol: 'DGC', name: 'Hóa chất Đức Giang', currentPrice: 95000, dividendPerShare: 4000, dividendYield: 4.21, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Hóa chất', marketCap: 45000e9, consistencyScore: 5 },
+    { symbol: 'VNM', name: 'Vinamilk', currentPrice: 72000, dividendPerShare: 2900, dividendYield: 4.03, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Quarterly', sector: 'Tiêu dùng', marketCap: 145000e9, consistencyScore: 5 },
+    { symbol: 'SAB', name: 'Sabeco', currentPrice: 65000, dividendPerShare: 1500, dividendYield: 2.31, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Tiêu dùng', marketCap: 42000e9, consistencyScore: 5 },
+    { symbol: 'PLX', name: 'Petrolimex', currentPrice: 44000, dividendPerShare: 1500, dividendYield: 3.41, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Dầu khí', marketCap: 56000e9, consistencyScore: 4 },
+    { symbol: 'PNJ', name: 'Vàng bạc Phú Nhuận', currentPrice: 115000, dividendPerShare: 1500, dividendYield: 1.30, dividendHistory: [], stockDividendRatio: 0.05, payoutFrequency: 'Annually', sector: 'Bán lẻ', marketCap: 35000e9, consistencyScore: 5 },
+    { symbol: 'VHM', name: 'Vinhomes', currentPrice: 42000, dividendPerShare: 1000, dividendYield: 2.38, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Bất động sản', marketCap: 185000e9, consistencyScore: 4 },
+    { symbol: 'FPT', name: 'FPT Corporation', currentPrice: 145000, dividendPerShare: 2000, dividendYield: 1.38, dividendHistory: [], stockDividendRatio: 0.15, payoutFrequency: 'Semi-annually', sector: 'Công nghệ', marketCap: 150000e9, consistencyScore: 5 },
+    { symbol: 'VCB', name: 'Vietcombank', currentPrice: 88000, dividendPerShare: 800, dividendYield: 0.91, dividendHistory: [], stockDividendRatio: 0.38, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 450000e9, consistencyScore: 5 },
+    { symbol: 'BID', name: 'BIDV', currentPrice: 48000, dividendPerShare: 800, dividendYield: 1.67, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 245000e9, consistencyScore: 5 },
+    { symbol: 'CTG', name: 'VietinBank', currentPrice: 35000, dividendPerShare: 500, dividendYield: 1.43, dividendHistory: [], stockDividendRatio: 0.27, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 175000e9, consistencyScore: 4 },
+    { symbol: 'MBB', name: 'MB Bank', currentPrice: 25000, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.15, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 95000e9, consistencyScore: 4 },
+    { symbol: 'ACB', name: 'ACB', currentPrice: 25500, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.15, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 88000e9, consistencyScore: 4 },
+    { symbol: 'TCB', name: 'Techcombank', currentPrice: 52000, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.15, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 185000e9, consistencyScore: 4 },
+    { symbol: 'VPB', name: 'VPBank', currentPrice: 21000, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.10, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 85000e9, consistencyScore: 3 },
+    { symbol: 'HDB', name: 'HDBank', currentPrice: 25000, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.10, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 58000e9, consistencyScore: 4 },
+    { symbol: 'SHB', name: 'SHB', currentPrice: 13500, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.11, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 42000e9, consistencyScore: 3 },
+    { symbol: 'SSB', name: 'SeABank', currentPrice: 28000, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.10, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 35000e9, consistencyScore: 3 },
+    { symbol: 'LPB', name: 'LienVietPostBank', currentPrice: 15000, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.12, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 28000e9, consistencyScore: 3 },
+    { symbol: 'HPG', name: 'Hòa Phát', currentPrice: 27000, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.10, payoutFrequency: 'Annually', sector: 'Thép', marketCap: 130000e9, consistencyScore: 3 },
+    { symbol: 'MSN', name: 'Masan Group', currentPrice: 82000, dividendPerShare: 1000, dividendYield: 1.22, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Tiêu dùng', marketCap: 115000e9, consistencyScore: 3 },
+    { symbol: 'MWG', name: 'Thế Giới Di Động', currentPrice: 62000, dividendPerShare: 500, dividendYield: 0.81, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Bán lẻ', marketCap: 92000e9, consistencyScore: 3 },
+    { symbol: 'VIC', name: 'Vingroup', currentPrice: 42000, dividendPerShare: 500, dividendYield: 1.19, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Bất động sản', marketCap: 180000e9, consistencyScore: 3 },
+    { symbol: 'GVR', name: 'Cao su VN', currentPrice: 22000, dividendPerShare: 300, dividendYield: 1.36, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Cao su', marketCap: 92000e9, consistencyScore: 4 },
+    { symbol: 'POW', name: 'Điện lực Dầu khí', currentPrice: 13000, dividendPerShare: 700, dividendYield: 5.38, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Điện', marketCap: 32000e9, consistencyScore: 4 },
+    { symbol: 'BCM', name: 'Becamex IDC', currentPrice: 75000, dividendPerShare: 600, dividendYield: 0.80, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Bất động sản', marketCap: 45000e9, consistencyScore: 3 },
+    { symbol: 'SSI', name: 'SSI Securities', currentPrice: 35000, dividendPerShare: 1000, dividendYield: 2.86, dividendHistory: [], stockDividendRatio: 0.20, payoutFrequency: 'Annually', sector: 'Chứng khoán', marketCap: 48000e9, consistencyScore: 4 },
+    { symbol: 'VRE', name: 'Vincom Retail', currentPrice: 24000, dividendPerShare: 300, dividendYield: 1.25, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Bất động sản', marketCap: 56000e9, consistencyScore: 3 },
+    { symbol: 'STB', name: 'Sacombank', currentPrice: 38000, dividendPerShare: 0, dividendYield: 0, dividendHistory: [], stockDividendRatio: 0.15, payoutFrequency: 'Annually', sector: 'Ngân hàng', marketCap: 75000e9, consistencyScore: 3 },
+    { symbol: 'VJC', name: 'Vietjet Air', currentPrice: 98000, dividendPerShare: 1000, dividendYield: 1.02, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Hàng không', marketCap: 52000e9, consistencyScore: 2 },
 ];
 
 type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol';
 
 export default function DividendScreenerPage() {
-    const [stocks, setStocks] = useState<StockDividendData[]>(SAMPLE_STOCKS);
+    const [stocks, setStocks] = useState<StockDividendData[]>(VN30_STOCKS);
     const [sortField, setSortField] = useState<SortField>('dividendYield');
     const [sortAsc, setSortAsc] = useState(false);
     const [filter, setFilter] = useState({
@@ -187,7 +81,7 @@ export default function DividendScreenerPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const sectors = ['all', ...new Set(SAMPLE_STOCKS.map(s => s.sector))];
+    const sectors = ['all', ...new Set(VN30_STOCKS.map(s => s.sector))];
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -285,7 +179,7 @@ export default function DividendScreenerPage() {
                                 onChange={e => setFilter(f => ({ ...f, sector: e.target.value }))}
                             >
                                 <option value="all">Tất cả ngành</option>
-                                {sectors.filter(s => s !== 'all').map(s => (
+                                {sectors.filter((s): s is string => s !== 'all').map(s => (
                                     <option key={s} value={s}>{s}</option>
                                 ))}
                             </select>
@@ -392,7 +286,7 @@ export default function DividendScreenerPage() {
                                         </td>
                                         <td className="p-3 text-right">
                                             <span className={`font-bold font-mono ${stock.dividendYield >= 5 ? 'text-emerald-400' :
-                                                    stock.dividendYield >= 3 ? 'text-amber-400' : 'text-slate-300'
+                                                stock.dividendYield >= 3 ? 'text-amber-400' : 'text-slate-300'
                                                 }`}>
                                                 {stock.dividendYield.toFixed(2)}%
                                             </span>
