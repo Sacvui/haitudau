@@ -142,6 +142,9 @@ export default function DashboardPage() {
       setResult(primaryData.result);
       setDividendData(primaryData.dividends);
 
+      // Debug: Log timeline data
+      console.log('Timeline data:', primaryData.result.timeline?.length, 'events');
+
     } catch (e) {
       console.error(e);
       alert("Không thể lấy dữ liệu. Vui lòng thử lại với mã khác (VD: FPT, VNM, HPG).");
