@@ -1,64 +1,266 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useState, useCallback } from 'react';
+import { Sidebar } from '@/components/Sidebar';
+import { ControlBar } from '@/components/dashboard/ControlBar';
+import { KpiGrid } from '@/components/dashboard/KpiGrid';
+import { ComparisonGrid } from '@/components/dashboard/ComparisonGrid';
+import { PriceChart, YearlyPerformanceChart, DividendBreakdown } from '@/components/Charts';
+import { GlassCard } from '@/components/ui/glass';
+import { calculateInvestment } from '@/lib/investment-calculator';
+import { Menu, Search, Bell, User, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+interface InvestmentResult {
+  symbol: string;
+  currentValue: number;
+  totalInvested: number;
+  currentPrice: number;
+  absoluteReturn: number;
+  percentageReturn: number;
+  annualizedReturn: number;
+  dividendsCashReceived: number;
+  dividendsReinvested: number;
+  dividendsStockReceived: number;
+  timeline: unknown[];
+  monthlyPerformance: unknown[];
+  yearlyPerformance: { year: number; return: number; dividends: number }[];
+}
+
+interface PriceDataPoint {
+  date: string;
+  close: number;
+  savingsValue: number;
+  compareClose?: number;
+}
+
+export default function DashboardPage() {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<InvestmentResult | null>(null);
+  const [compareResult, setCompareResult] = useState<InvestmentResult | null>(null);
+  const [priceData, setPriceData] = useState<PriceDataPoint[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [formData, setFormData] = useState({
+    symbol: '',
+    compareSymbol: '', // NEW: comparison symbol
+    startDate: '2020-01-01',
+    endDate: new Date().toISOString().split('T')[0], // Today
+    initialAmount: 100000000,
+    monthlyInvestment: 0,
+    reinvestDividends: true,
+  });
+
+  // Helper function to analyze a single stock
+  const analyzeStock = async (symbol: string): Promise<{ result: InvestmentResult; prices: PriceDataPoint[] } | null> => {
+    const priceRes = await fetch(`/api/stock/history?symbol=${symbol}&startDate=${formData.startDate}&endDate=${formData.endDate}`);
+    const priceJson = await priceRes.json();
+
+    if (!priceJson.success || !priceJson.data.length) return null;
+    const prices = priceJson.data;
+
+    const divRes = await fetch(`/api/stock/dividends?symbol=${symbol}`);
+    const divJson = await divRes.json();
+    const dividends = divJson.success ? divJson.data : [];
+
+    const investmentResult = calculateInvestment(
+      { ...formData, symbol },
+      prices,
+      dividends.map((d: { exDate: string; type: string; value: number }) => ({ ...d, description: "Cổ tức" }))
+    );
+
+    return { result: { ...investmentResult, symbol } as InvestmentResult, prices };
+  };
+
+  const handleAnalyze = useCallback(async () => {
+    if (!formData.symbol) return;
+    setLoading(true);
+    setResult(null);
+    setCompareResult(null);
+
+    try {
+      // 1. Analyze primary stock
+      const primaryData = await analyzeStock(formData.symbol);
+      if (!primaryData) throw new Error("No data for primary stock");
+
+      // 2. Benchmark Savings Logic (6.5%/year)
+      const monthlyRate = 0.065 / 12;
+      let savingsBalance = formData.initialAmount;
+      const monthlyDCA = formData.monthlyInvestment || 0;
+
+      let mergedData = primaryData.prices.map((p: PriceDataPoint, idx: number) => {
+        if (idx > 0 && idx % 22 === 0) {
+          savingsBalance = savingsBalance * (1 + monthlyRate) + monthlyDCA;
+        }
+        return { ...p, savingsValue: savingsBalance };
+      });
+
+      // 3. Analyze comparison stock if provided
+      if (formData.compareSymbol && formData.compareSymbol !== formData.symbol) {
+        const compareData = await analyzeStock(formData.compareSymbol);
+        if (compareData) {
+          setCompareResult(compareData.result);
+
+          // Merge compare prices into primary data
+          const compareMap = new Map(compareData.prices.map((p: PriceDataPoint) => [p.date, p.close]));
+          mergedData = mergedData.map((p: PriceDataPoint) => ({
+            ...p,
+            compareClose: compareMap.get(p.date) ?? undefined,
+          }));
+        }
+      }
+
+      setPriceData(mergedData);
+      setResult(primaryData.result);
+
+    } catch (e) {
+      console.error(e);
+      alert("Không thể lấy dữ liệu. Vui lòng thử lại với mã khác (VD: FPT, VNM, HPG).");
+    } finally {
+      setLoading(false);
+    }
+  }, [formData]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex h-screen w-full bg-[#030712] overflow-hidden font-sans text-slate-100 selection:bg-indigo-500/30">
+
+      {/* GALAXY BACKGROUND */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-900/20 blur-[120px] rounded-full mix-blend-screen animate-pulse" style={{ animationDuration: '4s' }} />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-violet-900/10 blur-[100px] rounded-full mix-blend-screen" />
+      </div>
+
+      {/* --- SIDEBAR --- */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-[280px] bg-[#0b1121]/90 backdrop-blur-xl border-r border-white/5 transition-transform duration-300 ease-in-out shadow-2xl
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:static lg:translate-x-0
+      `}>
+        <Sidebar className="h-full w-full bg-transparent border-none shadow-none" />
+      </aside>
+
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+      )}
+
+      {/* --- MAIN CONTENT SHELL --- */}
+      <main className="flex-1 flex flex-col min-w-0 h-full relative z-10">
+
+        {/* 1. Header */}
+        <header className="h-16 flex-none bg-[#0b1121]/60 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-6 z-20">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" className="lg:hidden text-slate-400 hover:bg-white/5" onClick={() => setSidebarOpen(true)}>
+              <Menu className="w-5 h-5" />
+            </Button>
+            <div>
+              <h2 className="text-sm font-bold text-white tracking-widest uppercase flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                Market Dashboard
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center bg-white/5 border border-white/10 rounded-full px-4 py-1.5 w-72 focus-within:bg-white/10 focus-within:border-indigo-500/50 transition-all">
+              <Search className="w-3.5 h-3.5 text-slate-400 mr-2" />
+              <input className="bg-transparent border-none outline-none text-xs text-white w-full placeholder-slate-500 font-medium" placeholder="Tìm kiếm thị trường..." />
+            </div>
+            <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-white/5 rounded-full">
+              <Bell className="w-5 h-5" />
+            </Button>
+            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-cyan-500 p-[1.5px] shadow-lg shadow-indigo-500/20 cursor-pointer hover:scale-105 transition-transform">
+              <div className="h-full w-full rounded-full bg-[#0b1121] flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* 2. Control Bar (Sticky) */}
+        <div className="flex-none z-10 relative">
+          <ControlBar
+            formData={formData}
+            setFormData={setFormData}
+            onAnalyze={handleAnalyze}
+            loading={loading}
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* 3. Workspace (Scrollable) */}
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 scroll-smooth custom-scrollbar">
+          <div className="max-w-[1920px] mx-auto space-y-6">
+
+            {/* KPI Section */}
+            {result && <KpiGrid data={result} />}
+
+            {/* Comparison Section - NEW */}
+            {result && compareResult && (
+              <ComparisonGrid primaryResult={result} compareResult={compareResult} />
+            )}
+
+            {/* Charts Area */}
+            {result ? (
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 pb-10">
+                {/* Main Chart */}
+                <div className="xl:col-span-8 h-full">
+                  <GlassCard className="h-full p-1" delay={0.2}>
+                    <div className="p-4 border-b border-white/5 bg-white/[0.02]">
+                      <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        Hiệu Suất Tài Sản
+                      </h3>
+                    </div>
+                    <div className="p-4 h-[500px]">
+                      <PriceChart data={priceData} height={460} />
+                    </div>
+                  </GlassCard>
+                </div>
+
+                {/* Side Charts */}
+                <div className="xl:col-span-4 space-y-6">
+                  <div className="h-[280px]">
+                    <DividendBreakdown
+                      cashDividends={result.dividendsCashReceived}
+                      stockDividends={result.dividendsStockReceived * (result.currentPrice || 0)}
+                      reinvested={result.dividendsReinvested}
+                    />
+                  </div>
+                  <div className="h-[200px]">
+                    <YearlyPerformanceChart data={result.yearlyPerformance} height={140} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Empty State - Hero Section */
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 animate-in fade-in zoom-in duration-1000">
+                <div className="relative group cursor-default">
+                  <div className="absolute inset-0 bg-indigo-500/30 blur-[100px] rounded-full group-hover:bg-indigo-500/40 transition-all duration-1000" />
+                  <h1 className="relative text-7xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-600 tracking-tighter select-none drop-shadow-2xl">
+                    HẢI TỪ ĐÂU
+                  </h1>
+                  <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50 blur-sm"></div>
+                </div>
+                <p className="text-slate-400 max-w-lg mx-auto text-base md:text-lg font-light leading-relaxed">
+                  Hệ thống mô phỏng đầu tư chứng khoán cao cấp. <br />
+                  <span className="text-indigo-400 font-medium">Data Realtime</span> • <span className="text-emerald-400 font-medium">Phân tích Kỹ thuật</span> • <span className="text-amber-400 font-medium">Lãi kép</span>
+                </p>
+
+                <div className="mt-8 flex gap-4">
+                  <div className="px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur text-xs font-mono text-slate-400">
+                    VNDIRECT Connected
+                  </div>
+                  <div className="px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur text-xs font-mono text-slate-400">
+                    SSI iBoard Ready
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+
       </main>
     </div>
   );
