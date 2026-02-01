@@ -252,5 +252,89 @@
             "value": 35,
             "description": "Cổ tức năm 2021 bằng cổ phiếu tỷ lệ 100:35"
         }
+    ],
+    "PNJ": [
+        {
+            "exDate": "2024-04-22",
+            "type": "cash",
+            "value": 1500,
+            "description": "Cổ tức năm 2023 bằng tiền: 1,500đ/CP (15%)"
+        },
+        {
+            "exDate": "2023-04-20",
+            "type": "cash",
+            "value": 1300,
+            "description": "Cổ tức năm 2022 bằng tiền: 1,300đ/CP (13%)"
+        },
+        {
+            "exDate": "2023-04-20",
+            "type": "stock",
+            "value": 5,
+            "description": "Cổ tức năm 2022 bằng cổ phiếu tỷ lệ 100:5 (5%)"
+        },
+        {
+            "exDate": "2022-04-22",
+            "type": "cash",
+            "value": 1300,
+            "description": "Cổ tức năm 2021 bằng tiền: 1,300đ/CP"
+        },
+        {
+            "exDate": "2021-05-21",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức năm 2020 bằng tiền: 1,000đ/CP"
+        },
+        {
+            "exDate": "2020-04-24",
+            "type": "cash",
+            "value": 1500,
+            "description": "Cổ tức năm 2019 bằng tiền: 1,500đ/CP"
+        }
+    ],
+    "DGC": [
+        {
+            "exDate": "2024-04-12",
+            "type": "cash",
+            "value": 4000,
+            "description": "Cổ tức năm 2023 bằng tiền: 4,000đ/CP"
+        },
+        {
+            "exDate": "2023-07-07",
+            "type": "cash",
+            "value": 5000,
+            "description": "Cổ tức năm 2022 bằng tiền: 5,000đ/CP"
+        },
+        {
+            "exDate": "2022-07-08",
+            "type": "cash",
+            "value": 3000,
+            "description": "Cổ tức năm 2021 bằng tiền: 3,000đ/CP"
+        },
+        {
+            "exDate": "2021-06-25",
+            "type": "cash",
+            "value": 2000,
+            "description": "Cổ tức năm 2020 bằng tiền: 2,000đ/CP"
+        }
+    ],
+    "TCB": [
+        {
+            "exDate": "2024-06-07",
+            "type": "stock",
+            "value": 15,
+            "description": "Cổ tức năm 2023 bằng cổ phiếu tỷ lệ 100:15"
+        },
+        {
+            "exDate": "2023-05-19",
+            "type": "stock",
+            "value": 15,
+            "description": "Cổ tức năm 2022 bằng cổ phiếu tỷ lệ 100:15"
+        },
+        {
+            "exDate": "2022-06-17",
+            "type": "stock",
+            "value": 20,
+            "description": "Cổ tức năm 2021 bằng cổ phiếu tỷ lệ 5:1 (20%)"
+        }
     ]
 }
