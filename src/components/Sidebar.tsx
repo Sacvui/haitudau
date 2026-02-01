@@ -36,10 +36,10 @@ export function Sidebar({ className }: SidebarProps) {
             <div className="absolute top-0 left-0 w-full h-64 bg-indigo-600/5 blur-[80px] pointer-events-none" />
 
             {/* 1. LOGO BRANDING */}
-            <div className="flex-none p-6 pb-8 pt-8">
+            <div className="flex-none p-4 pb-6 pt-6 md:p-6 md:pb-8 md:pt-8">
                 <Link href="/" className="flex items-center justify-center group relative">
-                    {/* Logo Container */}
-                    <div className="relative w-48 h-16 flex-shrink-0">
+                    {/* Logo Container - Larger on desktop */}
+                    <div className="relative w-32 h-12 md:w-56 md:h-20 flex-shrink-0">
                         {/* Glow Layer */}
                         <div className="absolute inset-0 bg-indigo-500/20 blur-xl opacity-40 group-hover:opacity-60 transition-opacity duration-500"></div>
                         {/* Logo Image */}
