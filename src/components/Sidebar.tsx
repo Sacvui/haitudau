@@ -11,6 +11,8 @@ import {
     Settings,
     LogOut,
     TrendingUp,
+    Coins,
+    Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -20,10 +22,10 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
-    { label: 'Tổng Quan', icon: LayoutDashboard, href: '/', active: true },
-    { label: 'Danh Mục', icon: Wallet, href: '/' },
-    { label: 'Phân Tích', icon: LineChart, href: '/' },
-    { label: 'Tin Tức', icon: Newspaper, href: '/' },
+    { label: 'Tổng Quan', icon: LayoutDashboard, href: '/' },
+    { label: 'Cổ Tức Screener', icon: Coins, href: '/screener' },
+    { label: 'Mục Tiêu Đầu Tư', icon: Target, href: '/planner' },
+    { label: 'Lịch Sử', icon: LineChart, href: '/history' },
 ];
 
 export function Sidebar({ className }: SidebarProps) {
@@ -55,24 +57,27 @@ export function Sidebar({ className }: SidebarProps) {
             {/* 2. NAVIGATION */}
             <div className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
                 <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-4 mb-2 mt-2">Menu Chính</div>
-                {NAV_ITEMS.map((item) => (
-                    <Link
-                        key={item.label}
-                        href={item.href}
-                        className={cn(
-                            "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group relative overflow-hidden",
-                            item.active
-                                ? "bg-gradient-to-r from-indigo-500/10 to-purple-500/5 text-indigo-300 border border-indigo-500/20"
-                                : "text-slate-400 hover:text-white hover:bg-slate-800/40"
-                        )}
-                    >
-                        {item.active && (
-                            <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-indigo-500 shadow-[0_0_10px_2px_rgba(99,102,241,0.5)]" />
-                        )}
-                        <item.icon className={cn("w-5 h-5 transition-colors", item.active ? "text-indigo-400" : "text-slate-500 group-hover:text-slate-300")} />
-                        {item.label}
-                    </Link>
-                ))}
+                {NAV_ITEMS.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                        <Link
+                            key={item.label}
+                            href={item.href}
+                            className={cn(
+                                "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group relative overflow-hidden",
+                                isActive
+                                    ? "bg-gradient-to-r from-indigo-500/10 to-purple-500/5 text-indigo-300 border border-indigo-500/20"
+                                    : "text-slate-400 hover:text-white hover:bg-slate-800/40"
+                            )}
+                        >
+                            {isActive && (
+                                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-indigo-500 shadow-[0_0_10px_2px_rgba(99,102,241,0.5)]" />
+                            )}
+                            <item.icon className={cn("w-5 h-5 transition-colors", isActive ? "text-indigo-400" : "text-slate-500 group-hover:text-slate-300")} />
+                            {item.label}
+                        </Link>
+                    );
+                })}
 
                 <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-4 mb-2 mt-8">Hệ Thống</div>
                 <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/40 transition-all duration-200">
