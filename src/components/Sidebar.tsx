@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Logo } from '@/components/ui/Logo';
 import {
     LayoutDashboard,
     LineChart,
@@ -40,18 +41,10 @@ export function Sidebar({ className }: SidebarProps) {
             <div className="absolute top-0 left-0 w-full h-64 bg-indigo-600/5 blur-[80px] pointer-events-none" />
 
             {/* 1. LOGO BRANDING */}
-            <div className="flex-none p-4 pb-6 pt-6 md:p-6 md:pb-8 md:pt-8">
-                <Link href="/" className="flex items-center justify-center group relative">
-                    {/* Logo Container - Larger on desktop */}
-                    <div className="relative w-32 h-12 md:w-56 md:h-20 flex-shrink-0">
-                        {/* Glow Layer */}
-                        <div className="absolute inset-0 bg-indigo-500/20 blur-xl opacity-40 group-hover:opacity-60 transition-opacity duration-500"></div>
-                        {/* Logo Image */}
-                        <img
-                            src="/logo.png"
-                            alt="Hải Từ Đâu - Invest OS"
-                            className="relative w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                        />
+            <div className="flex-none p-4 pb-6 pt-6 md:p-6 md:pb-8 md:pt-8 flex justify-center">
+                <Link href="/" className="group relative block w-full no-underline">
+                    <div className="transform group-hover:scale-105 transition-transform duration-300 origin-center flex justify-center">
+                        <Logo size="default" />
                     </div>
                 </Link>
             </div>

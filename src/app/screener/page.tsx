@@ -18,6 +18,7 @@ import {
     ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
+import { ScreenerSkeleton } from '@/components/ui/skeleton';
 
 interface StockDividendData {
     symbol: string;
@@ -67,10 +68,16 @@ const VN30_STOCKS: StockDividendData[] = [
     { symbol: 'VJC', name: 'Vietjet Air', currentPrice: 98000, dividendPerShare: 1000, dividendYield: 1.02, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Hàng không', marketCap: 52000e9, consistencyScore: 2 },
 ];
 
+// Keep static fallback data
+const VN30_STOCKS_STATIC: StockDividendData[] = [
+    { symbol: 'GAS', name: 'PV GAS', currentPrice: 85000, dividendPerShare: 4000, dividendYield: 4.71, dividendHistory: [], stockDividendRatio: 0, payoutFrequency: 'Annually', sector: 'Dầu khí', marketCap: 165000e9, consistencyScore: 5 },
+    // ... (rest of static data implied, we can keep using existing const if we didn't rename it, but let's just use the existing VN30_STOCKS as fallback)
+];
+
 type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol';
 
 export default function DividendScreenerPage() {
-    const [stocks, setStocks] = useState<StockDividendData[]>(VN30_STOCKS);
+    const [stocks, setStocks] = useState<StockDividendData[]>([]);
     const [sortField, setSortField] = useState<SortField>('dividendYield');
     const [sortAsc, setSortAsc] = useState(false);
     const [filter, setFilter] = useState({
@@ -79,9 +86,31 @@ export default function DividendScreenerPage() {
         minConsistency: 0,
     });
     const [searchQuery, setSearchQuery] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-    const sectors = ['all', ...new Set(VN30_STOCKS.map(s => s.sector))];
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const res = await fetch('/api/stock/screener');
+                const result = await res.json();
+
+                if (result.success && result.data && result.data.length > 0) {
+                    setStocks(result.data);
+                } else {
+                    setStocks(VN30_STOCKS); // Fallback to static
+                }
+            } catch (error) {
+                console.error("Error fetching screener data:", error);
+                setStocks(VN30_STOCKS); // Fallback
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    const sectors = ['all', ...new Set((stocks.length > 0 ? stocks : VN30_STOCKS).map(s => s.sector))];
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
