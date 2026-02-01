@@ -21,6 +21,7 @@ export interface InvestmentResult {
     absoluteReturn: number;
     percentageReturn: number;
     annualizedReturn: number;
+    maxDrawdown: number; // Max Drawdown percentage (negative)
     dividendsCashReceived: number;
     dividendsStockReceived: number;
     dividendsReinvested: number;
@@ -286,6 +287,21 @@ export function calculateInvestment(
         }
     });
 
+    // Calculate Max Drawdown from timeline
+    let maxDrawdown = 0;
+    let peak = 0;
+    timeline.forEach(event => {
+        if (event.portfolioValue > peak) {
+            peak = event.portfolioValue;
+        }
+        if (peak > 0) {
+            const drawdown = (event.portfolioValue - peak) / peak * 100;
+            if (drawdown < maxDrawdown) {
+                maxDrawdown = drawdown;
+            }
+        }
+    });
+
     return {
         symbol: input.symbol,
         initialInvestment: input.initialAmount,
@@ -298,6 +314,7 @@ export function calculateInvestment(
         absoluteReturn,
         percentageReturn,
         annualizedReturn,
+        maxDrawdown,
         dividendsCashReceived,
         dividendsStockReceived,
         dividendsReinvested,

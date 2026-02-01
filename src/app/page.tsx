@@ -296,9 +296,7 @@ export default function DashboardPage() {
                     />
 
                     {/* Yearly Performance Bar */}
-                    <div className="h-[180px]">
-                      <YearlyPerformanceChart data={result.yearlyPerformance} height={160} />
-                    </div>
+                    <YearlyPerformanceChart data={result.yearlyPerformance} height={120} />
 
                     {/* Dividend Table History */}
                     <DividendTable dividends={dividendData} symbol={result.symbol} />

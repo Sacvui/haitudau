@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { GlassCard, NeonText } from '@/components/ui/glass';
-import { TrendingUp, TrendingDown, Wallet, Layers, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, Layers, Activity, AlertTriangle } from 'lucide-react';
 import CountUp from 'react-countup';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +12,7 @@ interface InvestmentResultData {
     absoluteReturn: number;
     percentageReturn: number;
     annualizedReturn: number;
+    maxDrawdown?: number;
     dividendsCashReceived: number;
     dividendsReinvested: number;
     currentPrice: number;
@@ -27,51 +28,65 @@ export function KpiGrid({ data }: KpiGridProps) {
     const isProfit = data.absoluteReturn >= 0;
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* 1. Tổng Tài Sản - Highlight nhất */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* 1. Tổng Tài Sản */}
             <KpiCard
                 title="TỔNG TÀI SẢN"
                 value={data.currentValue}
                 prefix
-                subValue={`Vốn gốc: ${new Intl.NumberFormat('vi-VN', { notation: "compact" }).format(data.totalInvested)}`}
-                icon={<Wallet className="w-5 h-5 text-white" />}
+                subValue={`Vốn: ${new Intl.NumberFormat('vi-VN', { notation: "compact" }).format(data.totalInvested)}`}
+                icon={<Wallet className="w-4 h-4 text-white" />}
                 iconBg="bg-gradient-to-br from-emerald-500 to-teal-600"
                 textColor="emerald"
                 delay={0}
             />
 
-            {/* 2. Lợi Nhuận Ròng - Quan trọng nhì */}
+            {/* 2. Lợi Nhuận Ròng */}
             <KpiCard
-                title="LỢI NHUẬN RÒNG"
+                title="LỢI NHUẬN"
                 value={Math.abs(data.absoluteReturn)}
                 prefix={isProfit ? '+' : '-'}
-                subValue={`${data.percentageReturn.toFixed(2)}% Tổng`}
-                icon={isProfit ? <TrendingUp className="w-5 h-5 text-white" /> : <TrendingDown className="w-5 h-5 text-white" />}
+                subValue={`${data.percentageReturn.toFixed(1)}%`}
+                icon={isProfit ? <TrendingUp className="w-4 h-4 text-white" /> : <TrendingDown className="w-4 h-4 text-white" />}
                 iconBg={isProfit ? 'bg-gradient-to-br from-emerald-500 to-green-600' : 'bg-gradient-to-br from-rose-500 to-red-600'}
                 textColor={isProfit ? 'emerald' : 'rose'}
                 delay={0.1}
             />
 
-            {/* 3. CAGR - Hiệu suất năm */}
+            {/* 3. CAGR */}
             <KpiCard
-                title="HIỆU SUẤT NĂM (CAGR)"
+                title="CAGR"
                 value={data.annualizedReturn}
                 suffix="%"
-                decimals={2}
-                subValue="Lợi nhuận kép trung bình"
-                icon={<Activity className="w-5 h-5 text-white" />}
+                decimals={1}
+                subValue="Lợi nhuận kép/năm"
+                icon={<Activity className="w-4 h-4 text-white" />}
                 iconBg="bg-gradient-to-br from-indigo-500 to-purple-600"
                 textColor="indigo"
                 delay={0.2}
             />
 
-            {/* 4. Cổ Tức - Thu nhập thụ động */}
+            {/* 4. Max Drawdown */}
             <KpiCard
-                title="TỔNG CỔ TỨC NHẬN"
+                title="MAX DRAWDOWN"
+                value={Math.abs(data.maxDrawdown || 0)}
+                prefix="-"
+                suffix="%"
+                decimals={1}
+                subValue="Mức lỗ sâu nhất"
+                icon={<AlertTriangle className="w-4 h-4 text-white" />}
+                iconBg="bg-gradient-to-br from-rose-500 to-orange-600"
+                textColor="rose"
+                delay={0.25}
+            />
+
+            {/* 5. Cổ Tức */}
+            <KpiCard
+                title="CỔ TỨC"
                 value={data.dividendsCashReceived + (data.dividendsReinvested || 0)}
                 prefix
-                subValue="Thu nhập thụ động tích lũy"
-                icon={<Layers className="w-5 h-5 text-white" />}
+                subValue="Thu nhập thụ động"
+                icon={<Layers className="w-4 h-4 text-white" />}
                 iconBg="bg-gradient-to-br from-amber-500 to-orange-600"
                 textColor="amber"
                 delay={0.3}
