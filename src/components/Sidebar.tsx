@@ -13,6 +13,7 @@ import {
     TrendingUp,
     Coins,
     Target,
+    Calendar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ interface SidebarProps {
 const NAV_ITEMS = [
     { label: 'Tổng Quan', icon: LayoutDashboard, href: '/' },
     { label: 'Cổ Tức Screener', icon: Coins, href: '/screener' },
+    { label: 'Lịch Cổ Tức', icon: Calendar, href: '/calendar' },
     { label: 'Mục Tiêu Đầu Tư', icon: Target, href: '/planner' },
     { label: 'Lịch Sử', icon: LineChart, href: '/history' },
 ];

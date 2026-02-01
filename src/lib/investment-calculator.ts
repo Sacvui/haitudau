@@ -209,21 +209,23 @@ export function calculateInvestment(
 
             } else {
                 // Stock Dividend (Bonus Shares)
-                // Tính số cổ phiếu thưởng dựa trên tỷ lệ
-                const bonusShares = Math.floor(totalShares * (dividend.value / 100));
-                const bonusValue = bonusShares * price.close;
+                // QUAN TRỌNG: SSI/DNSE API trả về adjusted price (đã điều chỉnh theo cổ tức cổ phiếu)
+                // => KHÔNG cộng thêm cổ phiếu thưởng vào số lượng sở hữu
+                // => Chỉ ghi nhận GIÁ TRỊ để hiển thị trong timeline
 
-                // CỘNG CỔ PHIẾU THƯỞNG VÀO SỐ LƯỢNG
-                totalShares += bonusShares;
+                const theoreticalBonusShares = Math.floor(totalShares * (dividend.value / 100));
+                const bonusValue = theoreticalBonusShares * price.close;
+
+                // Ghi nhận giá trị (không cộng vào totalShares)
                 dividendsStockReceived += bonusValue;
 
                 timeline.push({
                     date: price.date,
                     type: 'dividend_stock',
-                    description: `Cổ tức CP ${dividend.value}%: +${bonusShares.toLocaleString()} CP`,
-                    shares: bonusShares,
+                    description: `Cổ tức CP ${dividend.value}% (≈${theoreticalBonusShares.toLocaleString()} CP - đã phản ánh trong giá)`,
+                    shares: theoreticalBonusShares,
                     pricePerShare: price.close,
-                    totalShares, // Đã cộng thêm
+                    totalShares, // Giữ nguyên
                     portfolioValue: (totalShares * price.close) + cashBalance,
                     cashBalance
                 });
