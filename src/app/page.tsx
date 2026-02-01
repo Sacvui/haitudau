@@ -8,6 +8,7 @@ import { ComparisonGrid } from '@/components/dashboard/ComparisonGrid';
 import { DividendTable } from '@/components/dashboard/DividendTable';
 import { TransactionTimeline } from '@/components/dashboard/TransactionTimeline';
 import { YearlyDetailTable } from '@/components/dashboard/YearlyDetailTable';
+import { NAVChart } from '@/components/dashboard/NAVChart';
 import { PriceChart, YearlyPerformanceChart, DividendBreakdown } from '@/components/Charts';
 import { GlassCard } from '@/components/ui/glass';
 import { calculateInvestment } from '@/lib/investment-calculator';
@@ -61,6 +62,7 @@ export default function DashboardPage() {
   const [result, setResult] = useState<InvestmentResult | null>(null);
   const [compareResult, setCompareResult] = useState<InvestmentResult | null>(null);
   const [priceData, setPriceData] = useState<PriceDataPoint[]>([]);
+  const [navData, setNavData] = useState<{ date: string; portfolioValue: number; totalCost: number; savingsValue: number }[]>([]);
   const [dividendData, setDividendData] = useState<DividendEvent[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -143,7 +145,34 @@ export default function DashboardPage() {
       setResult(primaryData.result);
       setDividendData(primaryData.dividends);
 
-      // Debug: Log timeline data
+      // Generate NAV data from timeline for portfolio value chart
+      const timeline = primaryData.result.timeline || [];
+      if (timeline.length > 0) {
+        const monthlyRate = 0.065 / 12;
+        let savingsBalance = formData.initialAmount;
+        let totalCost = formData.initialAmount;
+
+        const navPoints = timeline
+          .filter((e: TimelineEvent) => e.portfolioValue > 0)
+          .map((e: TimelineEvent, idx: number) => {
+            // Update savings benchmark
+            if (idx > 0 && idx % 22 === 0) {
+              savingsBalance = savingsBalance * (1 + monthlyRate);
+            }
+            if (e.type === 'buy' || e.type === 'deposit') {
+              totalCost += e.shares * e.pricePerShare;
+              savingsBalance += e.shares * e.pricePerShare;
+            }
+            return {
+              date: e.date,
+              portfolioValue: e.portfolioValue,
+              totalCost,
+              savingsValue: savingsBalance,
+            };
+          });
+        setNavData(navPoints);
+      }
+
       console.log('Timeline data:', primaryData.result.timeline?.length, 'events');
 
     } catch (e) {
@@ -247,45 +276,32 @@ export default function DashboardPage() {
             {/* Charts Area */}
             {result ? (
               <>
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 pb-10">
-                  {/* Main Chart */}
-                  <div className="xl:col-span-8 h-full">
-                    <GlassCard className="h-full p-1" delay={0.2}>
-                      <div className="p-4 border-b border-white/5 bg-white/[0.02]">
-                        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                          Hiệu Suất Tài Sản
-                        </h3>
-                      </div>
-                      <div className="p-4 h-[500px]">
-                        <PriceChart data={priceData} height={460} />
-                      </div>
-                    </GlassCard>
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 pb-6">
+                  {/* Main NAV Chart */}
+                  <div className="xl:col-span-8">
+                    <NAVChart
+                      data={navData}
+                      height={420}
+                      symbol={result.symbol}
+                    />
                   </div>
 
                   {/* Side Charts */}
-                  <div className="xl:col-span-4 space-y-6">
-                    <div className="min-h-[280px]">
-                      <DividendBreakdown
-                        cashDividends={result.dividendsCashReceived}
-                        stockDividends={result.dividendsStockReceived}
-                        reinvested={result.dividendsReinvested}
-                      />
+                  <div className="xl:col-span-4 space-y-4">
+                    {/* Dividend Breakdown Pie */}
+                    <DividendBreakdown
+                      cashDividends={result.dividendsCashReceived}
+                      stockDividends={result.dividendsStockReceived}
+                      reinvested={result.dividendsReinvested}
+                    />
+
+                    {/* Yearly Performance Bar */}
+                    <div className="h-[180px]">
+                      <YearlyPerformanceChart data={result.yearlyPerformance} height={160} />
                     </div>
 
                     {/* Dividend Table History */}
-                    <div>
-                      <DividendTable dividends={dividendData} symbol={result.symbol} />
-                    </div>
-
-                    {/* Transaction Timeline - Expandable */}
-                    <TransactionTimeline
-                      timeline={result.timeline}
-                      symbol={result.symbol}
-                    />
-
-                    <div className="h-[200px]">
-                      <YearlyPerformanceChart data={result.yearlyPerformance} height={140} />
-                    </div>
+                    <DividendTable dividends={dividendData} symbol={result.symbol} />
                   </div>
                 </div>
 
