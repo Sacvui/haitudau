@@ -11,25 +11,37 @@ import {
     CartesianGrid,
     Tooltip,
     Area,
-    AreaChart, // Added AreaChart
+    AreaChart,
     BarChart,
     PieChart,
     Pie,
     Cell,
     ReferenceLine,
+    ReferenceDot,
+    Scatter,
+    ScatterChart,
 } from 'recharts';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, BarChart3, Calendar, PieChart as PieIcon, Lightbulb, ArrowUp, ArrowDown } from 'lucide-react';
+import { TrendingUp, BarChart3, Calendar, PieChart as PieIcon, Lightbulb, ArrowUp, ArrowDown, Coins, Gift } from 'lucide-react';
+
+interface TimelineEvent {
+    date: string;
+    type: 'buy' | 'sell' | 'dividend_cash' | 'dividend_stock' | 'reinvest' | 'deposit';
+    description: string;
+    totalShares: number;
+    portfolioValue: number;
+}
 
 interface AssetGrowthChartProps {
     data: {
         date: string;
         close: number;
         volume?: number;
-        savingsValue?: number; // Benchmark value
+        savingsValue?: number;
     }[];
+    timeline?: TimelineEvent[];
     height?: number;
 }
 

@@ -19,10 +19,22 @@ interface DividendEvent {
   description?: string;
 }
 
+interface TimelineEvent {
+  date: string;
+  type: 'buy' | 'sell' | 'dividend_cash' | 'dividend_stock' | 'reinvest' | 'deposit';
+  description: string;
+  shares: number;
+  pricePerShare: number;
+  totalShares: number;
+  portfolioValue: number;
+  cashBalance: number;
+}
+
 interface InvestmentResult {
   symbol: string;
   currentValue: number;
   totalInvested: number;
+  totalShares: number;
   currentPrice: number;
   absoluteReturn: number;
   percentageReturn: number;
@@ -30,7 +42,7 @@ interface InvestmentResult {
   dividendsCashReceived: number;
   dividendsReinvested: number;
   dividendsStockReceived: number;
-  timeline: unknown[];
+  timeline: TimelineEvent[];
   monthlyPerformance: unknown[];
   yearlyPerformance: { year: number; return: number; dividends: number }[];
 }
