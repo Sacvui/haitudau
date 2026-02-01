@@ -210,8 +210,17 @@ export default function DashboardPage() {
         <div className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 scroll-smooth custom-scrollbar">
           <div className="max-w-[1920px] mx-auto space-y-6">
 
-            {/* KPI Section */}
-            {result && <KpiGrid data={result} />}
+            {/* KPI Section - Hiển thị mã chính, có nhãn nếu đang so sánh */}
+            {result && (
+              <div className="relative">
+                {compareResult && (
+                  <div className="absolute -top-2 left-4 z-10 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    {result.symbol} (Mã chính)
+                  </div>
+                )}
+                <KpiGrid data={result} />
+              </div>
+            )}
 
             {/* Comparison Section - NEW */}
             {result && compareResult && (
@@ -240,7 +249,7 @@ export default function DashboardPage() {
                   <div className="h-[280px]">
                     <DividendBreakdown
                       cashDividends={result.dividendsCashReceived}
-                      stockDividends={result.dividendsStockReceived * (result.currentPrice || 0)}
+                      stockDividends={result.dividendsStockReceived}
                       reinvested={result.dividendsReinvested}
                     />
                   </div>
