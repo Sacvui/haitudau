@@ -143,14 +143,17 @@ export function ControlBar({ formData, setFormData, onAnalyze, loading }: Contro
                             onClick={onAnalyze}
                             disabled={!formData.symbol || loading}
                             className={`
-                                h-10 px-6 font-bold text-xs uppercase tracking-wider shadow-lg transition-all duration-300
+                                relative h-10 px-6 font-bold text-xs uppercase tracking-wider transition-all duration-300 overflow-hidden
                                 ${loading
-                                    ? 'bg-slate-700 cursor-wait'
-                                    : 'bg-indigo-600 hover:bg-indigo-500 hover:shadow-indigo-500/25 hover:scale-105 active:scale-95'
+                                    ? 'bg-slate-700 cursor-wait shadow-none'
+                                    : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-[0_0_20px_rgba(99,102,241,0.5)] hover:shadow-[0_0_30px_rgba(139,92,246,0.7)] hover:scale-105 active:scale-95'
                                 }
                             `}
                         >
-                            {loading ? 'ĐANG TÍNH...' : 'PHÂN TÍCH NGAY'}
+                            {!loading && (
+                                <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -skew-x-12 animate-[shimmer_2s_infinite]" />
+                            )}
+                            <span className="relative">{loading ? 'ĐANG TÍNH...' : '✨ PHÂN TÍCH NGAY'}</span>
                         </Button>
                     </div>
 

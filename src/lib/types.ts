@@ -66,6 +66,7 @@ export interface MonthlyPerformance {
     low: number;
     return: number;
     portfolioValue: number;
+    cashBalance: number;
 }
 
 export interface YearlyPerformance {
@@ -80,6 +81,7 @@ export interface Stock {
     symbol: string;
     name: string;
     exchange: string;
+    sector?: string; // e.g. 'Bank', 'Tech', 'Steel'
 }
 
 // API Response types
@@ -89,4 +91,46 @@ export interface ApiResponse<T> {
     error?: string;
     total?: number;
     source?: string;
+}
+
+// --- ROTATION STRATEGY TYPES ---
+
+export interface RotationConfig {
+    initialCapital: number;
+    startDate: string;
+    endDate: string;
+    monthlyInvestment: number;
+    strategyType: 'MUSCLE' | 'CONSUMER'; // MUSCLE: VIB-FPT-HPG, CONSUMER: VIB-FPT-MSN
+}
+
+export interface RotationTransaction {
+    date: string;
+    type: 'SWITCH_BUY' | 'SWITCH_SELL' | 'DIVIDEND' | 'DEPOSIT';
+    symbol: string;
+    price: number;
+    quantity: number;
+    value: number;
+    fee: number;
+    cashBalanceAfter: number;
+    note: string; // e.g. "Chuyển sang FPT (Mùa Công Nghệ)"
+}
+
+export interface RotationResult {
+    config: RotationConfig;
+    finalValue: number;
+    totalProfit: number;
+    percentageReturn: number;
+    cagr: number;
+    history: RotationTransaction[];
+    chartData: {
+        date: string;
+        value: number;
+        symbol: string; // Current active symbol
+        note?: string; // Marker for chart
+    }[];
+    breakdown: {
+        priceAppreciation: number;
+        cashDividends: number;
+        stockDividendsValue: number;
+    };
 }

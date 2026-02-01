@@ -1,4 +1,4 @@
-import { StockDataPoint, DividendInfo } from './stock-api';
+import { StockDataPoint, DividendInfo, RotationConfig, RotationResult, RotationTransaction } from './types';
 
 export interface InvestmentInput {
     symbol: string;

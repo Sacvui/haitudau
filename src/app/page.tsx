@@ -5,11 +5,19 @@ import { Sidebar } from '@/components/Sidebar';
 import { ControlBar } from '@/components/dashboard/ControlBar';
 import { KpiGrid } from '@/components/dashboard/KpiGrid';
 import { ComparisonGrid } from '@/components/dashboard/ComparisonGrid';
+import { DividendTable } from '@/components/dashboard/DividendTable';
 import { PriceChart, YearlyPerformanceChart, DividendBreakdown } from '@/components/Charts';
 import { GlassCard } from '@/components/ui/glass';
 import { calculateInvestment } from '@/lib/investment-calculator';
 import { Menu, Search, Bell, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
+interface DividendEvent {
+  date: string;
+  type: 'cash' | 'stock';
+  value: number;
+  description?: string;
+}
 
 interface InvestmentResult {
   symbol: string;
@@ -39,6 +47,7 @@ export default function DashboardPage() {
   const [result, setResult] = useState<InvestmentResult | null>(null);
   const [compareResult, setCompareResult] = useState<InvestmentResult | null>(null);
   const [priceData, setPriceData] = useState<PriceDataPoint[]>([]);
+  const [dividendData, setDividendData] = useState<DividendEvent[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -52,7 +61,7 @@ export default function DashboardPage() {
   });
 
   // Helper function to analyze a single stock
-  const analyzeStock = async (symbol: string): Promise<{ result: InvestmentResult; prices: PriceDataPoint[] } | null> => {
+  const analyzeStock = async (symbol: string): Promise<{ result: InvestmentResult; prices: PriceDataPoint[], dividends: DividendEvent[] } | null> => {
     const priceRes = await fetch(`/api/stock/history?symbol=${symbol}&startDate=${formData.startDate}&endDate=${formData.endDate}`);
     const priceJson = await priceRes.json();
 
@@ -63,13 +72,19 @@ export default function DashboardPage() {
     const divJson = await divRes.json();
     const dividends = divJson.success ? divJson.data : [];
 
+    const formattedDividends = dividends.map((d: any) => ({
+      ...d,
+      description: d.description || "Cổ tức",
+      date: d.exDate // Map exDate to date for Table component
+    })); // Keep exDate for calculation logic if needed
+
     const investmentResult = calculateInvestment(
       { ...formData, symbol },
       prices,
-      dividends.map((d: { exDate: string; type: string; value: number }) => ({ ...d, description: "Cổ tức" }))
+      formattedDividends.map((d: any) => ({ ...d, exDate: d.exDate || d.date })) // Ensure exDate exists for calculator
     );
 
-    return { result: { ...investmentResult, symbol } as InvestmentResult, prices };
+    return { result: { ...investmentResult, symbol } as InvestmentResult, prices, dividends: formattedDividends };
   };
 
   const handleAnalyze = useCallback(async () => {
@@ -112,6 +127,7 @@ export default function DashboardPage() {
 
       setPriceData(mergedData);
       setResult(primaryData.result);
+      setDividendData(primaryData.dividends);
 
     } catch (e) {
       console.error(e);
@@ -227,6 +243,11 @@ export default function DashboardPage() {
                       stockDividends={result.dividendsStockReceived * (result.currentPrice || 0)}
                       reinvested={result.dividendsReinvested}
                     />
+                  </div>
+
+                  {/* Dividend Table History */}
+                  <div>
+                    <DividendTable dividends={dividendData} symbol={result.symbol} />
                   </div>
                   <div className="h-[200px]">
                     <YearlyPerformanceChart data={result.yearlyPerformance} height={140} />
