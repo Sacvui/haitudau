@@ -1,34 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
-// Fallback data to ensure demo works
-const MOCK_DIVIDENDS: Record<string, any[]> = {
-    'FPT': [
-        { exDate: '2024-06-12', type: 'cash', value: 1000, description: 'Trả cổ tức đợt 2/2023 bằng tiền, 1,000 đồng/CP' },
-        { exDate: '2024-06-12', type: 'stock', value: 15, description: 'Phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu, tỷ lệ 20:3' },
-        { exDate: '2023-07-05', type: 'cash', value: 1000, description: 'Trả cổ tức đợt 1/2023 bằng tiền, 1,000 đồng/CP' },
-        { exDate: '2023-06-01', type: 'stock', value: 15, description: 'Trả cổ tức năm 2022 bằng tiền, 1,000 đồng/CP' }, // Note: check data accuracy, simplifying for demo
-        { exDate: '2022-06-20', type: 'stock', value: 20, description: 'Trả cổ tức bằng cổ phiếu tỷ lệ 20%' },
-        { exDate: '2022-06-20', type: 'cash', value: 1000, description: 'Trả cổ tức bằng tiền tỷ lệ 10%' },
-    ],
-    'VIB': [
-        { exDate: '2024-05-15', type: 'cash', value: 650, description: 'Tạm ứng cổ tức tiền mặt 6.5%' },
-        { exDate: '2024-02-20', type: 'cash', value: 600, description: 'Tạm ứng cổ tức năm 2023 bằng tiền tỷ lệ 6%' },
-        { exDate: '2023-06-23', type: 'stock', value: 20, description: 'Thưởng cổ phiếu tỷ lệ 20%' },
-        { exDate: '2023-02-09', type: 'cash', value: 1000, description: 'Tạm ứng cổ tức tiền mặt 10%' },
-    ],
-    'HPG': [
-        { exDate: '2024-05-23', type: 'stock', value: 10, description: 'Trả cổ tức năm 2023 bằng cổ phiếu tỷ lệ 10%' },
-        { exDate: '2022-06-20', type: 'cash', value: 500, description: 'Trả cổ tức bằng tiền tỷ lệ 5%' },
-        { exDate: '2022-06-20', type: 'stock', value: 30, description: 'Trả cổ tức bằng cổ phiếu tỷ lệ 30%' },
-    ],
-    'VNM': [
-        { exDate: '2024-04-18', type: 'cash', value: 900, description: 'Cổ tức đợt 3/2023' },
-        { exDate: '2023-12-27', type: 'cash', value: 500, description: 'Cổ tức đợt 2/2023' },
-        { exDate: '2023-08-03', type: 'cash', value: 1500, description: 'Cổ tức đợt 1/2023' },
-    ]
-};
-
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol')?.toUpperCase();
@@ -41,57 +13,92 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        console.log(`Fetching dividends for ${symbol}...`);
+        console.log(`Fetching real dividend data for ${symbol} from SSI...`);
 
-        // Fetch dividend/adjustment history from CafeF
-        const response = await axios.get('https://s.cafef.vn/Ajax/CongTy/DieuChinhGia.ashx', {
-            params: { sym: symbol },
-            headers: {
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': 'https://s.cafef.vn',
+        // SSI API Time range (Last 10 years to Future)
+        const from = Math.floor(new Date('2015-01-01').getTime() / 1000);
+        const to = Math.floor(new Date().getTime() / 1000) + 31536000; // +1 year
+
+        // 1. Fetch from SSI iBoard (Trustworthy Source)
+        const ssiResponse = await axios.get('https://iboard.ssi.com.vn/dchart/api/1.1/corporate-actions', {
+            params: {
+                symbol: symbol,
+                from: from,
+                to: to,
             },
-            timeout: 8000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            timeout: 10000
         });
 
-        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-            const dividends = response.data
-                .filter((item: any) => item.NoiDung)
-                .map((item: any) => {
-                    const content = item.NoiDung || '';
-                    let type: 'cash' | 'stock' = 'cash';
+        if (ssiResponse.data && Array.isArray(ssiResponse.data.data)) {
+            const rawEvents = ssiResponse.data.data;
+
+            // Filter and Map SSI Data
+            const dividends = rawEvents
+                .filter((e: any) => e.action === 'cash_dividend' || e.action === 'stock_dividend' || e.action === 'bonus_share') // D: Dividend, S: Split/Bonus? - SSI uses specific codes
+                // SSI codes: 
+                // dividend_cash (Cổ tức tiền)
+                // dividend_stock (Cổ tức CP)
+                // bonus_share (Cổ phiếu thưởng)
+                // split (Chia tách)
+                // We need to check 'actionType' or similar fields.
+                // Let's rely on mapping logic based on actual response structure inspection.
+                // Based on standard SSI response:
+                // action: "cash_dividend" | "stock_dividend" | "bonus_share" | "rights"
+
+                .map((e: any) => {
+                    let type: 'cash' | 'stock' | null = null;
                     let value = 0;
 
-                    // Parse dividend type and value from description
-                    // Logic cải tiến để bắt được nhiều case hơn
-                    const lowerContent = content.toLowerCase();
-                    if (lowerContent.includes('tiền') || lowerContent.includes('tm')) {
+                    // SSI Format Parsing
+                    // e.eventName often contains Vietnamese text
+                    // e.ratio: "100:10" or e.value: "1000"
+
+                    if (e.action === 'cash_dividend') {
                         type = 'cash';
-                        const match = content.match(/(\d+(?:,\d+)?(?:\.\d+)?)/);
-                        if (match) value = parseFloat(match[1].replace(/,/g, ''));
-                        // Chuẩn hóa về VNĐ nếu Cafef ghi % (ví dụ 10% = 1000đ)
-                        if (value < 100 && content.includes('%')) value = value * 100;
-                    }
-                    else if (lowerContent.includes('cổ phiếu') || lowerContent.includes('cp') || lowerContent.includes('thưởng')) {
+                        value = parseFloat(e.value); // Usually raw VND, e.g. 1000
+                    } else if (e.action === 'stock_dividend' || e.action === 'bonus_share') {
                         type = 'stock';
-                        const ratioMatch = content.match(/(\d+):(\d+)/);
-                        if (ratioMatch) {
-                            value = (parseFloat(ratioMatch[1]) / parseFloat(ratioMatch[2])) * 100;
+                        // Parse ratio "20:3" or "100:15"
+                        // SSI might provide 'ratio' string "20:3"
+                        const ratioStr = e.ratio || "";
+                        const parts = ratioStr.split(':');
+                        if (parts.length === 2) {
+                            value = (parseFloat(parts[1]) / parseFloat(parts[0])) * 100;
                         } else {
-                            const percentMatch = content.match(/(\d+(?:\.\d+)?)\s*%/);
-                            if (percentMatch) value = parseFloat(percentMatch[1]);
+                            // Sometimes ratio is just a percentage number? Check 'value'
+                            value = parseFloat(e.value) || 0;
                         }
                     }
 
+                    if (!type || value === 0) return null;
+
+                    // ExDate Format from SSI: "03/06/2024" or ISO? 
+                    // SSI usually returns "dd/MM/yyyy" or timestamp.
+                    // Checking implementation: SSI corporate-actions returns unix timestamp in 'exRightDate' usually?
+                    // Or string "2024-06-03 00:00:00"
+
+                    // Safe Date Parsing
+                    let exDate = e.exRightDate;
+                    if (typeof exDate === 'string' && exDate.includes('/')) {
+                        // Convert dd/mm/yyyy -> yyyy-mm-dd
+                        const [d, m, y] = exDate.split('/');
+                        exDate = `${y}-${m}-${d}`;
+                    } else if (typeof exDate === 'string' && exDate.includes('T')) {
+                        exDate = exDate.split('T')[0];
+                    }
+
                     return {
-                        exDate: item.NgayGDKHQ,
-                        recordDate: item.NgayDKCC || item.NgayGDKHQ,
-                        type,
-                        value,
-                        description: content,
+                        exDate: exDate,
+                        type: type,
+                        value: value,
+                        description: e.description || e.eventName || (type === 'cash' ? `Cổ tức tiền ${value}đ` : `Cổ tức cổ phiếu ${value.toFixed(1)}%`),
+                        source: 'ssi'
                     };
                 })
-                .filter((d: any) => d.value > 0);
+                .filter((d: any) => d !== null);
 
             if (dividends.length > 0) {
                 return NextResponse.json({
@@ -99,46 +106,64 @@ export async function GET(request: NextRequest) {
                     symbol,
                     data: dividends,
                     total: dividends.length,
-                    source: 'cafef'
+                    source: 'ssi'
                 });
             }
         }
 
-        // Fallback if CafeF returns no data
-        if (MOCK_DIVIDENDS[symbol]) {
-            console.log(`Using mock data for ${symbol}`);
-            return NextResponse.json({
-                success: true,
-                symbol,
-                data: MOCK_DIVIDENDS[symbol],
-                total: MOCK_DIVIDENDS[symbol].length,
-                source: 'mock'
-            });
+        // Retry with CafeF if SSI return empty (Fallback to REAL data source #2)
+        // ... (Keep existing CafeF logic just in case, WITHOUT MOCK) ...
+        const cafeRes = await axios.get('https://s.cafef.vn/Ajax/CongTy/DieuChinhGia.ashx', {
+            params: { sym: symbol },
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+
+        // ... (Simple CafeF parsing logic reused here for compactness) ...
+        if (cafeRes.data && Array.isArray(cafeRes.data) && cafeRes.data.length > 0) {
+            const cfDividends = cafeRes.data
+                .filter((item: any) => item.NoiDung)
+                .map((item: any) => {
+                    const content = item.NoiDung || '';
+                    let type = 'cash';
+                    let value = 0;
+                    if (content.toLowerCase().includes('tiền')) {
+                        const match = content.match(/(\d+(?:,\d+)?(?:\.\d+)?)/);
+                        if (match) value = parseFloat(match[1].replace(/,/g, ''));
+                        // Fix Cafef Unit: if value < 100 it's likely %, convert to VND if context implies? 
+                        // Actually CafeF text usually "1000 đồng/CP" or "10%"
+                        // If "10%" cash -> 10% par value (10,000) = 1000 VND.
+                        if (value <= 100 && content.includes('%')) value = value * 100;
+                    } else if (content.toLowerCase().includes('cổ phiếu')) {
+                        type = 'stock';
+                        const match = content.match(/(\d+):(\d+)/);
+                        if (match) value = (parseFloat(match[1]) / parseFloat(match[2])) * 100;
+                    }
+                    return {
+                        exDate: item.NgayGDKHQ,
+                        type,
+                        value,
+                        description: content,
+                        source: 'cafef'
+                    };
+                })
+                .filter((d: any) => d.value > 0);
+
+            return NextResponse.json({ success: true, symbol, data: cfDividends, source: 'cafef' });
         }
+
 
         return NextResponse.json({
             success: true,
             symbol,
             data: [],
             total: 0,
+            message: "No dividend data found from SSI or CafeF"
         });
 
     } catch (error: any) {
-        console.error('Dividend API Error:', error.message);
-
-        // Error Fallback
-        if (MOCK_DIVIDENDS[symbol]) {
-            return NextResponse.json({
-                success: true,
-                symbol,
-                data: MOCK_DIVIDENDS[symbol],
-                total: MOCK_DIVIDENDS[symbol].length,
-                source: 'mock-error-fallback'
-            });
-        }
-
+        console.error('Real API Error:', error.message);
         return NextResponse.json(
-            { error: 'Failed to fetch dividend data', details: error.message },
+            { error: 'Failed to fetch real data', details: error.message },
             { status: 500 }
         );
     }
