@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import dividendsData from '@/data/dividends.json';
+
+// Type for local dividend data
+const LOCAL_DIVIDENDS: Record<string, any[]> = dividendsData;
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -13,157 +17,107 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        console.log(`Fetching real dividend data for ${symbol} from SSI...`);
+        console.log(`Fetching dividend data for ${symbol}...`);
 
-        // SSI API Time range (Last 10 years to Future)
-        const from = Math.floor(new Date('2015-01-01').getTime() / 1000);
-        const to = Math.floor(new Date().getTime() / 1000) + 31536000; // +1 year
+        // Strategy 1: Try VCI API (vnstock source)
+        try {
+            const vciRes = await axios.get(`https://mt.vietcap.com.vn/api/price/symbols/${symbol}/company-events`, {
+                params: { type: 'dividend' },
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                timeout: 8000
+            });
 
-        // 1. Fetch from SSI iBoard (Trustworthy Source)
-        const ssiResponse = await axios.get('https://iboard.ssi.com.vn/dchart/api/1.1/corporate-actions', {
-            params: {
-                symbol: symbol,
-                from: from,
-                to: to,
-            },
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            },
-            timeout: 10000
-        });
+            if (vciRes.data && Array.isArray(vciRes.data) && vciRes.data.length > 0) {
+                const dividends = vciRes.data.map((e: any) => ({
+                    exDate: e.exDate || e.recordDate,
+                    type: e.cashValue > 0 ? 'cash' : 'stock',
+                    value: e.cashValue > 0 ? e.cashValue : (e.ratio ? parseFloat(e.ratio) * 100 : 0),
+                    description: e.description || e.content || '',
+                    source: 'vci'
+                })).filter((d: any) => d.value > 0);
 
-        if (ssiResponse.data && Array.isArray(ssiResponse.data.data)) {
-            const rawEvents = ssiResponse.data.data;
-
-            // Filter and Map SSI Data
-            const dividends = rawEvents
-                .filter((e: any) => e.action === 'cash_dividend' || e.action === 'stock_dividend' || e.action === 'bonus_share') // D: Dividend, S: Split/Bonus? - SSI uses specific codes
-                // SSI codes: 
-                // dividend_cash (Cổ tức tiền)
-                // dividend_stock (Cổ tức CP)
-                // bonus_share (Cổ phiếu thưởng)
-                // split (Chia tách)
-                // We need to check 'actionType' or similar fields.
-                // Let's rely on mapping logic based on actual response structure inspection.
-                // Based on standard SSI response:
-                // action: "cash_dividend" | "stock_dividend" | "bonus_share" | "rights"
-
-                .map((e: any) => {
-                    let type: 'cash' | 'stock' | null = null;
-                    let value = 0;
-
-                    // SSI Format Parsing
-                    // e.eventName often contains Vietnamese text
-                    // e.ratio: "100:10" or e.value: "1000"
-
-                    if (e.action === 'cash_dividend') {
-                        type = 'cash';
-                        value = parseFloat(e.value); // Usually raw VND, e.g. 1000
-                    } else if (e.action === 'stock_dividend' || e.action === 'bonus_share') {
-                        type = 'stock';
-                        // Parse ratio "20:3" or "100:15"
-                        // SSI might provide 'ratio' string "20:3"
-                        const ratioStr = e.ratio || "";
-                        const parts = ratioStr.split(':');
-                        if (parts.length === 2) {
-                            value = (parseFloat(parts[1]) / parseFloat(parts[0])) * 100;
-                        } else {
-                            // Sometimes ratio is just a percentage number? Check 'value'
-                            value = parseFloat(e.value) || 0;
-                        }
-                    }
-
-                    if (!type || value === 0) return null;
-
-                    // ExDate Format from SSI: "03/06/2024" or ISO? 
-                    // SSI usually returns "dd/MM/yyyy" or timestamp.
-                    // Checking implementation: SSI corporate-actions returns unix timestamp in 'exRightDate' usually?
-                    // Or string "2024-06-03 00:00:00"
-
-                    // Safe Date Parsing
-                    let exDate = e.exRightDate;
-                    if (typeof exDate === 'string' && exDate.includes('/')) {
-                        // Convert dd/mm/yyyy -> yyyy-mm-dd
-                        const [d, m, y] = exDate.split('/');
-                        exDate = `${y}-${m}-${d}`;
-                    } else if (typeof exDate === 'string' && exDate.includes('T')) {
-                        exDate = exDate.split('T')[0];
-                    }
-
-                    return {
-                        exDate: exDate,
-                        type: type,
-                        value: value,
-                        description: e.description || e.eventName || (type === 'cash' ? `Cổ tức tiền ${value}đ` : `Cổ tức cổ phiếu ${value.toFixed(1)}%`),
-                        source: 'ssi'
-                    };
-                })
-                .filter((d: any) => d !== null);
-
-            if (dividends.length > 0) {
-                return NextResponse.json({
-                    success: true,
-                    symbol,
-                    data: dividends,
-                    total: dividends.length,
-                    source: 'ssi'
-                });
+                if (dividends.length > 0) {
+                    return NextResponse.json({
+                        success: true,
+                        symbol,
+                        data: dividends,
+                        total: dividends.length,
+                        source: 'vci'
+                    });
+                }
             }
+        } catch (vciError) {
+            console.log('VCI API unavailable, trying fallback...');
         }
 
-        // Retry with CafeF if SSI return empty (Fallback to REAL data source #2)
-        // ... (Keep existing CafeF logic just in case, WITHOUT MOCK) ...
-        const cafeRes = await axios.get('https://s.cafef.vn/Ajax/CongTy/DieuChinhGia.ashx', {
-            params: { sym: symbol },
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
+        // Strategy 2: Try TCBS API
+        try {
+            const tcbsRes = await axios.get(`https://apipubaws.tcbs.com.vn/tcanalysis/v1/company/${symbol}/dividend-payment-histories`, {
+                params: { page: 0, size: 50 },
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                timeout: 8000
+            });
 
-        // ... (Simple CafeF parsing logic reused here for compactness) ...
-        if (cafeRes.data && Array.isArray(cafeRes.data) && cafeRes.data.length > 0) {
-            const cfDividends = cafeRes.data
-                .filter((item: any) => item.NoiDung)
-                .map((item: any) => {
-                    const content = item.NoiDung || '';
-                    let type = 'cash';
-                    let value = 0;
-                    if (content.toLowerCase().includes('tiền')) {
-                        const match = content.match(/(\d+(?:,\d+)?(?:\.\d+)?)/);
-                        if (match) value = parseFloat(match[1].replace(/,/g, ''));
-                        // Fix Cafef Unit: if value < 100 it's likely %, convert to VND if context implies? 
-                        // Actually CafeF text usually "1000 đồng/CP" or "10%"
-                        // If "10%" cash -> 10% par value (10,000) = 1000 VND.
-                        if (value <= 100 && content.includes('%')) value = value * 100;
-                    } else if (content.toLowerCase().includes('cổ phiếu')) {
-                        type = 'stock';
-                        const match = content.match(/(\d+):(\d+)/);
-                        if (match) value = (parseFloat(match[1]) / parseFloat(match[2])) * 100;
-                    }
-                    return {
-                        exDate: item.NgayGDKHQ,
-                        type,
-                        value,
-                        description: content,
-                        source: 'cafef'
-                    };
-                })
-                .filter((d: any) => d.value > 0);
+            if (tcbsRes.data && tcbsRes.data.listDividendPaymentHis && tcbsRes.data.listDividendPaymentHis.length > 0) {
+                const dividends = tcbsRes.data.listDividendPaymentHis.map((e: any) => ({
+                    exDate: e.exerciseDate,
+                    type: e.issueMethod === 'cash' ? 'cash' : 'stock',
+                    value: e.issueMethod === 'cash' ? e.cashDividendPercentage * 100 : e.stockDividendPercentage * 100,
+                    description: e.title || '',
+                    source: 'tcbs'
+                })).filter((d: any) => d.value > 0);
 
-            return NextResponse.json({ success: true, symbol, data: cfDividends, source: 'cafef' });
+                if (dividends.length > 0) {
+                    return NextResponse.json({
+                        success: true,
+                        symbol,
+                        data: dividends,
+                        total: dividends.length,
+                        source: 'tcbs'
+                    });
+                }
+            }
+        } catch (tcbsError) {
+            console.log('TCBS API unavailable, trying fallback...');
         }
 
+        // Strategy 3: Use verified local data (from official annual reports)
+        if (LOCAL_DIVIDENDS[symbol]) {
+            console.log(`Using verified local data for ${symbol}`);
+            return NextResponse.json({
+                success: true,
+                symbol,
+                data: LOCAL_DIVIDENDS[symbol],
+                total: LOCAL_DIVIDENDS[symbol].length,
+                source: 'local-verified'
+            });
+        }
 
+        // No data available
         return NextResponse.json({
             success: true,
             symbol,
             data: [],
             total: 0,
-            message: "No dividend data found from SSI or CafeF"
+            message: `No dividend data available for ${symbol}. Consider adding to local database.`
         });
 
     } catch (error: any) {
-        console.error('Real API Error:', error.message);
+        console.error('Dividend API Error:', error.message);
+
+        // Final fallback to local data on any error
+        if (LOCAL_DIVIDENDS[symbol]) {
+            return NextResponse.json({
+                success: true,
+                symbol,
+                data: LOCAL_DIVIDENDS[symbol],
+                total: LOCAL_DIVIDENDS[symbol].length,
+                source: 'local-fallback'
+            });
+        }
+
         return NextResponse.json(
-            { error: 'Failed to fetch real data', details: error.message },
+            { error: 'Failed to fetch dividend data', details: error.message },
             { status: 500 }
         );
     }

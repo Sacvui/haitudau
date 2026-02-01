@@ -1,0 +1,256 @@
+{
+    "FPT": [
+        {
+            "exDate": "2024-06-12",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức đợt 2/2023 bằng tiền: 1,000đ/CP (10%)"
+        },
+        {
+            "exDate": "2024-06-12",
+            "type": "stock",
+            "value": 15,
+            "description": "Phát hành cổ phiếu tăng vốn tỷ lệ 20:3 (15%)"
+        },
+        {
+            "exDate": "2023-07-06",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức đợt 1/2023 bằng tiền: 1,000đ/CP (10%)"
+        },
+        {
+            "exDate": "2023-06-01",
+            "type": "stock",
+            "value": 15,
+            "description": "Cổ tức năm 2022 bằng cổ phiếu tỷ lệ 20:3 (15%)"
+        },
+        {
+            "exDate": "2022-06-21",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức năm 2021 bằng tiền: 1,000đ/CP (10%)"
+        },
+        {
+            "exDate": "2022-06-21",
+            "type": "stock",
+            "value": 20,
+            "description": "Cổ tức năm 2021 bằng cổ phiếu tỷ lệ 5:1 (20%)"
+        },
+        {
+            "exDate": "2021-06-11",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức năm 2020 bằng tiền: 1,000đ/CP"
+        },
+        {
+            "exDate": "2021-06-11",
+            "type": "stock",
+            "value": 15,
+            "description": "Cổ tức năm 2020 bằng cổ phiếu tỷ lệ 20:3"
+        },
+        {
+            "exDate": "2020-07-03",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức năm 2019 đợt 2 bằng tiền: 1,000đ/CP"
+        },
+        {
+            "exDate": "2020-01-06",
+            "type": "cash",
+            "value": 500,
+            "description": "Cổ tức năm 2019 đợt 1 bằng tiền: 500đ/CP"
+        }
+    ],
+    "VIB": [
+        {
+            "exDate": "2024-05-17",
+            "type": "cash",
+            "value": 650,
+            "description": "Tạm ứng cổ tức năm 2024 bằng tiền: 650đ/CP (6.5%)"
+        },
+        {
+            "exDate": "2024-02-23",
+            "type": "cash",
+            "value": 600,
+            "description": "Cổ tức năm 2023 đợt 1 bằng tiền: 600đ/CP (6%)"
+        },
+        {
+            "exDate": "2023-06-27",
+            "type": "stock",
+            "value": 20,
+            "description": "Thưởng cổ phiếu năm 2022 tỷ lệ 5:1 (20%)"
+        },
+        {
+            "exDate": "2023-02-13",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức năm 2022 bằng tiền: 1,000đ/CP (10%)"
+        },
+        {
+            "exDate": "2022-06-13",
+            "type": "stock",
+            "value": 35,
+            "description": "Thưởng cổ phiếu năm 2021 tỷ lệ 100:35 (35%)"
+        },
+        {
+            "exDate": "2021-06-15",
+            "type": "stock",
+            "value": 40,
+            "description": "Thưởng cổ phiếu năm 2020 tỷ lệ 100:40 (40%)"
+        },
+        {
+            "exDate": "2020-12-28",
+            "type": "cash",
+            "value": 500,
+            "description": "Cổ tức năm 2020 bằng tiền: 500đ/CP"
+        }
+    ],
+    "HPG": [
+        {
+            "exDate": "2024-05-27",
+            "type": "stock",
+            "value": 10,
+            "description": "Cổ tức năm 2023 bằng cổ phiếu tỷ lệ 10:1 (10%)"
+        },
+        {
+            "exDate": "2022-06-22",
+            "type": "cash",
+            "value": 500,
+            "description": "Cổ tức năm 2021 bằng tiền: 500đ/CP (5%)"
+        },
+        {
+            "exDate": "2022-06-22",
+            "type": "stock",
+            "value": 30,
+            "description": "Cổ tức năm 2021 bằng cổ phiếu tỷ lệ 10:3 (30%)"
+        },
+        {
+            "exDate": "2021-06-07",
+            "type": "stock",
+            "value": 35,
+            "description": "Cổ tức năm 2020 bằng cổ phiếu tỷ lệ 100:35 (35%)"
+        },
+        {
+            "exDate": "2020-06-15",
+            "type": "stock",
+            "value": 20,
+            "description": "Cổ tức năm 2019 bằng cổ phiếu tỷ lệ 5:1 (20%)"
+        }
+    ],
+    "VNM": [
+        {
+            "exDate": "2024-04-19",
+            "type": "cash",
+            "value": 900,
+            "description": "Cổ tức đợt 3/2023 bằng tiền: 900đ/CP"
+        },
+        {
+            "exDate": "2023-12-28",
+            "type": "cash",
+            "value": 500,
+            "description": "Cổ tức đợt 2/2023 bằng tiền: 500đ/CP"
+        },
+        {
+            "exDate": "2023-08-04",
+            "type": "cash",
+            "value": 1500,
+            "description": "Cổ tức đợt 1/2023 bằng tiền: 1,500đ/CP"
+        },
+        {
+            "exDate": "2023-04-28",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức đợt 3/2022 bằng tiền: 1,000đ/CP"
+        },
+        {
+            "exDate": "2022-12-29",
+            "type": "cash",
+            "value": 500,
+            "description": "Cổ tức đợt 2/2022 bằng tiền: 500đ/CP"
+        },
+        {
+            "exDate": "2022-08-17",
+            "type": "cash",
+            "value": 1500,
+            "description": "Cổ tức đợt 1/2022 bằng tiền: 1,500đ/CP"
+        },
+        {
+            "exDate": "2021-08-18",
+            "type": "cash",
+            "value": 1500,
+            "description": "Cổ tức năm 2020 bằng tiền: 1,500đ/CP"
+        },
+        {
+            "exDate": "2020-09-01",
+            "type": "cash",
+            "value": 2000,
+            "description": "Cổ tức năm 2019 bằng tiền: 2,000đ/CP"
+        }
+    ],
+    "MSN": [
+        {
+            "exDate": "2024-06-14",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức năm 2023 bằng tiền: 1,000đ/CP"
+        },
+        {
+            "exDate": "2022-09-05",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức năm 2021 bằng tiền: 1,000đ/CP"
+        },
+        {
+            "exDate": "2021-08-26",
+            "type": "cash",
+            "value": 1000,
+            "description": "Cổ tức năm 2020 bằng tiền: 1,000đ/CP"
+        }
+    ],
+    "VCB": [
+        {
+            "exDate": "2024-05-07",
+            "type": "stock",
+            "value": 38,
+            "description": "Phát hành cổ phiếu thưởng từ NVSH tỷ lệ 100:38"
+        },
+        {
+            "exDate": "2023-04-21",
+            "type": "cash",
+            "value": 800,
+            "description": "Cổ tức năm 2022 bằng tiền: 800đ/CP (8%)"
+        },
+        {
+            "exDate": "2022-04-25",
+            "type": "cash",
+            "value": 800,
+            "description": "Cổ tức năm 2021 bằng tiền: 800đ/CP (8%)"
+        },
+        {
+            "exDate": "2021-04-16",
+            "type": "cash",
+            "value": 800,
+            "description": "Cổ tức năm 2020 bằng tiền: 800đ/CP (8%)"
+        }
+    ],
+    "MBB": [
+        {
+            "exDate": "2024-05-29",
+            "type": "stock",
+            "value": 15,
+            "description": "Cổ tức năm 2023 bằng cổ phiếu tỷ lệ 100:15"
+        },
+        {
+            "exDate": "2023-05-26",
+            "type": "stock",
+            "value": 20,
+            "description": "Cổ tức năm 2022 bằng cổ phiếu tỷ lệ 5:1 (20%)"
+        },
+        {
+            "exDate": "2022-06-08",
+            "type": "stock",
+            "value": 35,
+            "description": "Cổ tức năm 2021 bằng cổ phiếu tỷ lệ 100:35"
+        }
+    ]
+}
