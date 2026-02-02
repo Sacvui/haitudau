@@ -100,8 +100,8 @@ export function MonteCarloChart({ data, height = 400 }: MonteCarloChartProps) {
                             <Tooltip
                                 contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
                                 itemStyle={{ fontSize: '12px' }}
-                                formatter={(value: number, name: string) => [
-                                    `${(value / 1e6).toFixed(0)} Tr`,
+                                formatter={(value: any, name: any) => [
+                                    `${(Number(value) / 1e6).toFixed(0)} Tr`,
                                     name === 'p90' ? 'Lạc quan' : name === 'p50' ? 'Trung bình' : 'Rủi ro'
                                 ]}
                             />
