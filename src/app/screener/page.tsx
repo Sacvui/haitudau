@@ -152,6 +152,22 @@ export default function DividendScreenerPage() {
         ));
     };
 
+    const getSafetyStatus = (stock: StockDividendData) => {
+        // High Yield Risk
+        if (stock.dividendYield > 12) {
+            return { label: 'Cảnh Báo', color: 'bg-rose-500/20 text-rose-400 border-rose-500/50', icon: '☢️' };
+        }
+        // High Safety
+        if (stock.consistencyScore >= 4 && stock.dividendYield >= 1 && stock.dividendYield <= 10) {
+            return { label: 'An Toàn', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50', icon: '🛡️' };
+        }
+        // Unstable
+        if (stock.consistencyScore <= 2) {
+            return { label: 'Bấp Bênh', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50', icon: '⚠️' };
+        }
+        return { label: 'Trung Bình', color: 'bg-slate-500/20 text-slate-400 border-slate-500/50', icon: '➖' };
+    };
+
     return (
         <div className="min-h-screen bg-[#0a0f1a] p-6">
             <div className="max-w-7xl mx-auto space-y-6">
@@ -264,6 +280,7 @@ export default function DividendScreenerPage() {
                             <thead>
                                 <tr className="border-b border-white/5 bg-white/[0.02]">
                                     <th className="p-3 text-left text-xs font-bold text-slate-400 uppercase">#</th>
+                                    <th className="p-3 text-left text-xs font-bold text-slate-400 uppercase">An Toàn</th> {/* NEW COL */}
                                     <th
                                         className="p-3 text-left text-xs font-bold text-slate-400 uppercase cursor-pointer hover:text-white"
                                         onClick={() => handleSort('symbol')}
@@ -303,41 +320,51 @@ export default function DividendScreenerPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                                {filteredStocks.map((stock, idx) => (
-                                    <tr key={stock.symbol} className="hover:bg-white/[0.02] transition-colors">
-                                        <td className="p-3 text-slate-500">{idx + 1}</td>
-                                        <td className="p-3">
-                                            <span className="font-bold text-white">{stock.symbol}</span>
-                                        </td>
-                                        <td className="p-3 text-slate-300 max-w-[200px] truncate">{stock.name}</td>
-                                        <td className="p-3 text-right font-mono text-white">
-                                            {(stock.currentPrice / 1000).toFixed(1)}K
-                                        </td>
-                                        <td className="p-3 text-right">
-                                            <span className={`font-bold font-mono ${stock.dividendYield >= 5 ? 'text-emerald-400' :
-                                                stock.dividendYield >= 3 ? 'text-amber-400' : 'text-slate-300'
-                                                }`}>
-                                                {stock.dividendYield.toFixed(2)}%
-                                            </span>
-                                        </td>
-                                        <td className="p-3 text-right font-mono text-indigo-400">
-                                            {stock.stockDividendRatio > 0 ? `${(stock.stockDividendRatio * 100).toFixed(0)}%` : '-'}
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="flex items-center justify-center gap-0.5">
-                                                {renderStars(stock.consistencyScore)}
-                                            </div>
-                                        </td>
-                                        <td className="p-3 text-right text-slate-400 text-xs">{stock.sector}</td>
-                                        <td className="p-3 text-center">
-                                            <Link href={`/?symbol=${stock.symbol}`}>
-                                                <Button size="sm" variant="ghost" className="text-indigo-400 hover:text-indigo-300">
-                                                    Phân tích <ChevronRight className="w-4 h-4" />
-                                                </Button>
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {loading ? (
+                                    <tr><td colSpan={10}><ScreenerSkeleton /></td></tr>
+                                ) : filteredStocks.map((stock, idx) => {
+                                    const safety = getSafetyStatus(stock);
+                                    return (
+                                        <tr key={stock.symbol} className="hover:bg-white/[0.02] transition-colors">
+                                            <td className="p-3 text-slate-500">{idx + 1}</td>
+                                            <td className="p-3">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${safety.color}`}>
+                                                    {safety.icon} {safety.label}
+                                                </span>
+                                            </td>
+                                            <td className="p-3">
+                                                <span className="font-bold text-white">{stock.symbol}</span>
+                                            </td>
+                                            <td className="p-3 text-slate-300 max-w-[200px] truncate">{stock.name}</td>
+                                            <td className="p-3 text-right font-mono text-white">
+                                                {(stock.currentPrice / 1000).toFixed(1)}K
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                <span className={`font-bold font-mono ${stock.dividendYield >= 5 ? 'text-emerald-400' :
+                                                    stock.dividendYield >= 3 ? 'text-amber-400' : 'text-slate-300'
+                                                    }`}>
+                                                    {stock.dividendYield.toFixed(2)}%
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-right font-mono text-indigo-400">
+                                                {stock.stockDividendRatio > 0 ? `${(stock.stockDividendRatio * 100).toFixed(0)}%` : '-'}
+                                            </td>
+                                            <td className="p-3">
+                                                <div className="flex items-center justify-center gap-0.5">
+                                                    {renderStars(stock.consistencyScore)}
+                                                </div>
+                                            </td>
+                                            <td className="p-3 text-right text-slate-400 text-xs">{stock.sector}</td>
+                                            <td className="p-3 text-center">
+                                                <Link href={`/?symbol=${stock.symbol}`}>
+                                                    <Button size="sm" variant="ghost" className="text-indigo-400 hover:text-indigo-300">
+                                                        Phân tích <ChevronRight className="w-4 h-4" />
+                                                    </Button>
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
                             </tbody>
                         </table>
                     </div>

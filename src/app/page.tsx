@@ -14,6 +14,7 @@ import { GlassCard } from '@/components/ui/glass';
 import { calculateInvestment } from '@/lib/investment-calculator';
 import { Menu, Search, Bell, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ValuationChart } from '@/components/ValuationChart';
 
 interface DividendEvent {
   date: string;
