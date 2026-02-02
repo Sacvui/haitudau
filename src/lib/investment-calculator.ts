@@ -410,3 +410,77 @@ export function analyzeOptimalTiming(priceHistory: StockDataPoint[]) {
         })),
     };
 }
+
+export interface MonteCarloResult {
+    year: number;
+    percentiles: {
+        p10: number; // Worst case (10%)
+        p50: number; // Base case (Median)
+        p90: number; // Best case (90%)
+    };
+    simulations: number[][]; // (Optional) Raw data for scatter plot
+}
+
+/**
+ * Run Monte Carlo Simulation for Investment Projection
+ * Uses Geometric Brownian Motion (GBM) model
+ * dS = S * (mu * dt + sigma * dW)
+ */
+export function runMonteCarloSimulation(
+    initialAmount: number,
+    monthlyContribution: number,
+    years: number,
+    expectedReturnRate = 0.12, // 12% annual return
+    volatility = 0.20 // 20% standard deviation (VN-Index)
+): MonteCarloResult[] {
+    const numSimulations = 1000;
+    const dt = 1 / 12; // Time step 1 month
+    const totalSteps = years * 12;
+
+    // Store final values for each year
+    const yearlyResults: number[][] = Array.from({ length: years + 1 }, () => []);
+
+    for (let sim = 0; sim < numSimulations; sim++) {
+        let currentWealth = initialAmount;
+        yearlyResults[0].push(currentWealth);
+
+        for (let step = 1; step <= totalSteps; step++) {
+            // Random shock (Gaussian distribution)
+            // Box-Muller transform for normal distribution
+            const u1 = Math.random();
+            const u2 = Math.random();
+            const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+
+            // Calculate monthly return
+            // r = (mu - 0.5 * sigma^2) * dt + sigma * sqrt(dt) * Z
+            const drift = (expectedReturnRate - 0.5 * volatility * volatility) * dt;
+            const shock = volatility * Math.sqrt(dt) * z;
+            const monthlyReturn = Math.exp(drift + shock);
+
+            // Update wealth
+            currentWealth = currentWealth * monthlyReturn + monthlyContribution;
+
+            // Record at end of each year
+            if (step % 12 === 0) {
+                const yearIndex = step / 12;
+                yearlyResults[yearIndex].push(currentWealth);
+            }
+        }
+    }
+
+    // Process results to find percentiles
+    const results: MonteCarloResult[] = yearlyResults.map((values, yearIndex) => {
+        values.sort((a, b) => a - b);
+        const p10 = values[Math.floor(values.length * 0.10)] || 0;
+        const p50 = values[Math.floor(values.length * 0.50)] || 0;
+        const p90 = values[Math.floor(values.length * 0.90)] || 0;
+
+        return {
+            year: yearIndex,
+            percentiles: { p10, p50, p90 },
+            simulations: [] // Don't return raw data to save memory
+        };
+    });
+
+    return results;
+}

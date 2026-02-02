@@ -18,6 +18,8 @@ import {
     Info
 } from 'lucide-react';
 import Link from 'next/link';
+import { MonteCarloChart } from '@/components/MonteCarloChart';
+import { runMonteCarloSimulation, MonteCarloResult } from '@/lib/investment-calculator';
 
 interface PlanResult {
     monthlyRequired: number;
@@ -49,6 +51,31 @@ export default function GoalPlannerPage() {
     });
 
     const [showResult, setShowResult] = useState(false);
+    const [simData, setSimData] = useState<MonteCarloResult[]>([]);
+
+    React.useEffect(() => {
+        if (showResult) {
+            const { rate, dividend } = returnRates[goal.riskLevel];
+            const avgReturn = rate + (goal.includeDividends ? dividend : 0);
+
+            // Calculate Monthly Contribution (simplified logic for simulation input)
+            const monthlyRate = Math.pow(1 + avgReturn, 1 / 12) - 1;
+            const months = goal.years * 12;
+            const pvg = goal.initialAmount * Math.pow(1 + avgReturn, goal.years);
+            const remaining = goal.targetAmount - pvg;
+            const cf = Math.pow(1 + monthlyRate, months);
+            const monthlyContribution = remaining > 0 ? (remaining * monthlyRate) / (cf - 1) : 0;
+
+            const results = runMonteCarloSimulation(
+                goal.initialAmount,
+                monthlyContribution,
+                goal.years,
+                avgReturn,
+                goal.riskLevel === 'conservative' ? 0.15 : goal.riskLevel === 'moderate' ? 0.20 : 0.25
+            );
+            setSimData(results);
+        }
+    }, [showResult, goal]);
 
     const returnRates = {
         conservative: { rate: 0.08, dividend: 0.03 }, // 8% growth + 3% dividend
@@ -219,8 +246,8 @@ export default function GoalPlannerPage() {
                                         key={v}
                                         onClick={() => setGoal(g => ({ ...g, targetAmount: v }))}
                                         className={`px-3 py-1 text-xs rounded-full border transition-all ${goal.targetAmount === v
-                                                ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
-                                                : 'border-slate-700 text-slate-400 hover:border-slate-500'
+                                            ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                                            : 'border-slate-700 text-slate-400 hover:border-slate-500'
                                             }`}
                                     >
                                         {formatCurrency(v, true)}
@@ -248,8 +275,8 @@ export default function GoalPlannerPage() {
                                         key={y}
                                         onClick={() => setGoal(g => ({ ...g, years: y }))}
                                         className={`px-3 py-1 text-xs rounded-full border transition-all ${goal.years === y
-                                                ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
-                                                : 'border-slate-700 text-slate-400 hover:border-slate-500'
+                                            ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                                            : 'border-slate-700 text-slate-400 hover:border-slate-500'
                                             }`}
                                     >
                                         {y} năm
@@ -278,8 +305,8 @@ export default function GoalPlannerPage() {
                                         key={v}
                                         onClick={() => setGoal(g => ({ ...g, initialAmount: v }))}
                                         className={`px-3 py-1 text-xs rounded-full border transition-all ${goal.initialAmount === v
-                                                ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
-                                                : 'border-slate-700 text-slate-400 hover:border-slate-500'
+                                            ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                                            : 'border-slate-700 text-slate-400 hover:border-slate-500'
                                             }`}
                                     >
                                         {formatCurrency(v, true)}
@@ -303,8 +330,8 @@ export default function GoalPlannerPage() {
                                         key={r.key}
                                         onClick={() => setGoal(g => ({ ...g, riskLevel: r.key as any }))}
                                         className={`p-3 rounded-lg border text-center transition-all ${goal.riskLevel === r.key
-                                                ? `border-${r.color}-500 bg-${r.color}-500/10`
-                                                : 'border-slate-700 hover:border-slate-500'
+                                            ? `border-${r.color}-500 bg-${r.color}-500/10`
+                                            : 'border-slate-700 hover:border-slate-500'
                                             }`}
                                     >
                                         <p className={`text-sm font-bold ${goal.riskLevel === r.key ? `text-${r.color}-400` : 'text-white'}`}>
@@ -390,6 +417,9 @@ export default function GoalPlannerPage() {
                                 </div>
                             </div>
                         </GlassCard>
+
+                        {/* Monte Carlo Simulation Chart - NEW */}
+                        <MonteCarloChart data={simData} />
 
                         {/* Scenarios Comparison */}
                         <GlassCard className="p-6">
