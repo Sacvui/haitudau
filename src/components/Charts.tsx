@@ -259,9 +259,10 @@ export function MonthlyReturnsChart({ data, height = 300 }: MonthlyReturnsChartP
 interface YearlyPerformanceChartProps {
     data: { year: number; return: number; dividends: number }[];
     height?: number;
+    dividendGrowth?: { cagr3Year: number; cagr5Year: number };
 }
 
-export function YearlyPerformanceChart({ data, height = 300 }: YearlyPerformanceChartProps) {
+export function YearlyPerformanceChart({ data, height = 300, dividendGrowth }: YearlyPerformanceChartProps) {
     // Calculate insights
     const avgReturn = data.reduce((acc, d) => acc + d.return, 0) / data.length;
     const totalDividends = data.reduce((acc, d) => acc + d.dividends, 0);
@@ -272,28 +273,37 @@ export function YearlyPerformanceChart({ data, height = 300 }: YearlyPerformance
             <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                     <BarChart3 className="w-4 h-4 text-purple-400" />
-                    Hiệu suất hàng năm
+                    Hiệu suất hàng năm & Tăng trưởng cổ tức
                 </CardTitle>
                 <CardDescription className="text-xs">
-                    Lợi nhuận & cổ tức theo từng năm
+                    Phân tích lợi nhuận và xu hướng tăng trưởng cổ tức (CAGR)
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 {/* Insights */}
-                <div className="grid grid-cols-3 gap-3 mb-4 p-3 rounded-lg bg-white/[0.02]">
+                <div className="grid grid-cols-4 gap-3 mb-4 p-3 rounded-lg bg-white/[0.02]">
                     <div className="text-center">
                         <p className="text-[10px] text-muted-foreground uppercase">LN trung bình</p>
                         <p className={`text-sm font-bold ${avgReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                             {avgReturn >= 0 ? '+' : ''}{avgReturn.toFixed(1)}%
                         </p>
                     </div>
-                    <div className="text-center border-x border-white/5">
+                    <div className="text-center border-l border-white/5">
                         <p className="text-[10px] text-muted-foreground uppercase">Tổng cổ tức</p>
                         <p className="text-sm font-bold text-amber-400">{(totalDividends / 1e6).toFixed(1)}M</p>
                     </div>
-                    <div className="text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase">Năm có lãi</p>
-                        <p className="text-sm font-bold">{positiveYears}/{data.length}</p>
+                    {/* Dividend Growth Section - NEW */}
+                    <div className="text-center border-l border-white/5">
+                        <p className="text-[10px] text-muted-foreground uppercase">Tăng 3 năm</p>
+                        <p className={`text-sm font-bold ${dividendGrowth && dividendGrowth.cagr3Year > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                            {dividendGrowth ? `${dividendGrowth.cagr3Year.toFixed(1)}%` : 'N/A'}
+                        </p>
+                    </div>
+                    <div className="text-center border-l border-white/5">
+                        <p className="text-[10px] text-muted-foreground uppercase">Tăng 5 năm</p>
+                        <p className={`text-sm font-bold ${dividendGrowth && dividendGrowth.cagr5Year > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                            {dividendGrowth ? `${dividendGrowth.cagr5Year.toFixed(1)}%` : 'N/A'}
+                        </p>
                     </div>
                 </div>
 

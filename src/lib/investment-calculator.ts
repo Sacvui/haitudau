@@ -484,3 +484,60 @@ export function runMonteCarloSimulation(
 
     return results;
 }
+
+export interface DividendGrowth {
+    cagr3Year: number;
+    cagr5Year: number;
+    years: { year: number; totalDividend: number; growth: number }[];
+}
+
+export function calculateDividendCAGR(dividends: DividendInfo[]): DividendGrowth {
+    // 1. Group by Year
+    const byYear = new Map<number, number>();
+    dividends.forEach(d => {
+        if (d.type === 'cash') {
+            const year = new Date(d.exDate).getFullYear();
+            const current = byYear.get(year) || 0;
+            byYear.set(year, current + d.value);
+        }
+    });
+
+    const sortedYears = Array.from(byYear.entries())
+        .map(([year, totalDividend]) => ({ year, totalDividend }))
+        .sort((a, b) => a.year - b.year);
+
+    // Calculate YoY Growth
+    const yearsWithGrowth = sortedYears.map((item, index) => {
+        if (index === 0) return { ...item, growth: 0 };
+        const prev = sortedYears[index - 1];
+        const growth = prev.totalDividend > 0
+            ? ((item.totalDividend - prev.totalDividend) / prev.totalDividend) * 100
+            : 0;
+        return { ...item, growth };
+    });
+
+    // Calculate CAGR
+    // Formula: (End/Start)^(1/n) - 1
+    const calculateCAGR = (periodYears: number) => {
+        if (sortedYears.length < periodYears) return 0;
+
+        const endIndex = sortedYears.length - 1;
+        const startIndex = endIndex - (periodYears - 1);
+
+        if (startIndex < 0) return 0;
+
+        const startVal = sortedYears[startIndex].totalDividend;
+        const endVal = sortedYears[endIndex].totalDividend;
+        const n = sortedYears[endIndex].year - sortedYears[startIndex].year;
+
+        if (startVal <= 0 || n === 0) return 0;
+
+        return (Math.pow(endVal / startVal, 1 / n) - 1) * 100;
+    };
+
+    return {
+        cagr3Year: calculateCAGR(3),
+        cagr5Year: calculateCAGR(5),
+        years: yearsWithGrowth
+    };
+}

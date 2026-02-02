@@ -11,7 +11,7 @@ import { YearlyDetailTable } from '@/components/dashboard/YearlyDetailTable';
 import { NAVChart } from '@/components/dashboard/NAVChart';
 import { PriceChart, YearlyPerformanceChart, DividendBreakdown } from '@/components/Charts';
 import { GlassCard } from '@/components/ui/glass';
-import { calculateInvestment } from '@/lib/investment-calculator';
+import { calculateInvestment, calculateDividendCAGR } from '@/lib/investment-calculator';
 import { Menu, Search, Bell, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ValuationChart } from '@/components/ValuationChart';
@@ -76,6 +76,16 @@ export default function DashboardPage() {
     monthlyInvestment: 0,
     reinvestDividends: true,
   });
+
+  const dividendGrowth = React.useMemo(() => {
+    if (!dividendData.length) return undefined;
+    return calculateDividendCAGR(dividendData.map(d => ({
+      exDate: d.date,
+      value: d.value,
+      type: d.type,
+      description: ""
+    })));
+  }, [dividendData]);
 
   // Helper function to analyze a single stock
   const analyzeStock = async (symbol: string): Promise<{ result: InvestmentResult; prices: PriceDataPoint[], dividends: DividendEvent[] } | null> => {
@@ -297,7 +307,11 @@ export default function DashboardPage() {
                     />
 
                     {/* Yearly Performance Bar */}
-                    <YearlyPerformanceChart data={result.yearlyPerformance} height={120} />
+                    <YearlyPerformanceChart
+                      data={result.yearlyPerformance}
+                      height={120}
+                      dividendGrowth={dividendGrowth}
+                    />
 
                     {/* Dividend Table History */}
                     <DividendTable dividends={dividendData} symbol={result.symbol} />
