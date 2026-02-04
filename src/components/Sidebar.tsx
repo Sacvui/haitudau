@@ -29,6 +29,7 @@ const NAV_ITEMS = [
     { label: 'Cổ Tức Screener', icon: Coins, href: '/screener' },
     { label: 'Lịch Cổ Tức', icon: Calendar, href: '/calendar' },
     { label: 'Mục Tiêu Đầu Tư', icon: Target, href: '/planner' },
+    { label: 'Phân Tích "Hải"', icon: TrendingUp, href: '/analysis' },
     { label: 'Két Sắt (Private)', icon: Lock, href: '/portfolio' },
     { label: 'Lịch Sử', icon: LineChart, href: '/history' },
 ];
