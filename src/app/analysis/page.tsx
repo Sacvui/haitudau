@@ -264,12 +264,15 @@ export default function AnalysisPage() {
                                             .map(s => (
                                                 <button
                                                     key={s}
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
                                                         addSymbol(s);
                                                         setIsDropdownOpen(false);
                                                         setSearchTerm('');
+                                                        toast.success(`Đang tải dữ liệu ${s}...`);
                                                     }}
-                                                    className="text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 p-2 rounded text-center transition-colors"
+                                                    className="text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 p-2 rounded text-center transition-colors cursor-pointer active:scale-95 bg-slate-800/50"
                                                 >
                                                     {s}
                                                 </button>
