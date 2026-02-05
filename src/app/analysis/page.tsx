@@ -28,7 +28,14 @@ export default function AnalysisPage() {
     const [selectedSymbols, setSelectedSymbols] = useState<string[]>(['VNM', 'VIB']);
     const [chartData, setChartData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [timeRange, setTimeRange] = useState(12); // Months
+
+    // Default: Last 12 months
+    const [fromDate, setFromDate] = useState(() => {
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - 1);
+        return d.toISOString().split('T')[0];
+    });
+    const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -52,16 +59,9 @@ export default function AnalysisPage() {
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Calculate Start Date
-                const endDate = new Date();
-                const startDate = new Date();
-                startDate.setMonth(startDate.getMonth() - timeRange);
-
-                const formatDate = (d: Date) => d.toISOString().split('T')[0];
-
-                // Fetch all concurrently
+                // Fetch all concurrently using fromDate & toDate
                 const promises = selectedSymbols.map(async (sym) => {
-                    const res = await fetch(`/api/stock/history?symbol=${sym}&startDate=${formatDate(startDate)}&endDate=${formatDate(endDate)}`);
+                    const res = await fetch(`/api/stock/history?symbol=${sym}&startDate=${fromDate}&endDate=${toDate}`);
                     const json = await res.json();
 
                     // Fetch dividends too
@@ -102,18 +102,26 @@ export default function AnalysisPage() {
                             const normalized = ((pricePoint.close - startPrice) / startPrice) * 100;
 
                             point[stock.symbol] = normalized;
-                            point[`${stock.symbol}_price`] = pricePoint.close; // Keep raw for tooltip
-
-                            // Check Dividends
-                            // Map dividend exDate to this date? Or closest?
-                            const hasDividend = stock.dividends.find((d: any) => d.exDate === date || d.date === date);
-                            if (hasDividend) {
-                                point[`${stock.symbol}_div`] = hasDividend;
-                            }
+                            point[`${stock.symbol}_price`] = pricePoint.close;
                         }
                     });
 
                     return point;
+                });
+
+                // Smart Map Dividends (Fuzzy Match: Attach to next available trading date)
+                results.forEach(stock => {
+                    stock.dividends.forEach((div: any) => {
+                        const divDate = div.exDate || div.date;
+                        if (divDate < fromDate || divDate > toDate) return;
+
+                        // Find closest chart point (Greater or Equal)
+                        const matchPoint = processedData.find((p: any) => p.date >= divDate);
+
+                        if (matchPoint) {
+                            matchPoint[`${stock.symbol}_div`] = div;
+                        }
+                    });
                 });
 
                 setChartData(processedData);
@@ -126,10 +134,8 @@ export default function AnalysisPage() {
             }
         };
 
-        if (selectedSymbols.length > 0) {
-            fetchData();
-        }
-    }, [selectedSymbols, timeRange]);
+        fetchData();
+    }, [selectedSymbols, fromDate, toDate]);
 
     // Custom Tooltip
     // Show Dividend info if hovered
@@ -210,19 +216,20 @@ export default function AnalysisPage() {
                     </div>
 
                     {/* Time Range */}
-                    <div className="flex bg-slate-800/50 p-1 rounded-lg">
-                        {[6, 12, 36, 60].map(m => (
-                            <button
-                                key={m}
-                                onClick={() => setTimeRange(m)}
-                                className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${timeRange === m
-                                    ? 'bg-indigo-600 text-white shadow-lg'
-                                    : 'text-slate-400 hover:text-white'
-                                    }`}
-                            >
-                                {m < 12 ? `${m} Tháng` : `${m / 12} Năm`}
-                            </button>
-                        ))}
+                    <div className="flex bg-slate-800/50 p-1.5 rounded-lg border border-slate-700 items-center gap-2">
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={e => setFromDate(e.target.value)}
+                            className="bg-transparent text-white text-xs outline-none font-medium h-full [color-scheme:dark]"
+                        />
+                        <span className="text-slate-500 font-light">-</span>
+                        <input
+                            type="date"
+                            value={toDate}
+                            onChange={e => setToDate(e.target.value)}
+                            className="bg-transparent text-white text-xs outline-none font-medium h-full [color-scheme:dark]"
+                        />
                     </div>
                 </div>
 
@@ -324,7 +331,7 @@ export default function AnalysisPage() {
                             <XAxis
                                 dataKey="date"
                                 tick={{ fontSize: 10, fill: '#64748b' }}
-                                tickFormatter={(d) => format(new Date(d), timeRange > 12 ? 'MM/yy' : 'dd/MM')}
+                                tickFormatter={(d) => format(new Date(d), 'dd/MM/yy')}
                                 minTickGap={30}
                                 axisLine={false}
                                 tickLine={false}

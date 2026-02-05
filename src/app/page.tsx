@@ -264,7 +264,7 @@ export default function DashboardPage() {
         </div>
 
         {/* 3. Workspace (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 scroll-smooth custom-scrollbar">
+        <div className="flex-1 overflow-visible lg:overflow-y-auto p-4 lg:p-6 pb-20 scroll-smooth custom-scrollbar">
           <div className="max-w-[1920px] mx-auto space-y-6">
 
             {/* KPI Section - Hiển thị mã chính, có nhãn nếu đang so sánh */}
