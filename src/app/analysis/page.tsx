@@ -254,6 +254,21 @@ export default function AnalysisPage() {
                                                 autoFocus
                                                 value={searchTerm}
                                                 onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        const filtered = STOCK_LIST
+                                                            .filter(s => !selectedSymbols.includes(s))
+                                                            .filter(s => s.includes(searchTerm));
+
+                                                        if (filtered.length > 0) {
+                                                            const firstMatch = filtered[0];
+                                                            addSymbol(firstMatch);
+                                                            setIsDropdownOpen(false);
+                                                            setSearchTerm('');
+                                                            toast.success(`Đang tải dữ liệu ${firstMatch}...`);
+                                                        }
+                                                    }
+                                                }}
                                             />
                                         </div>
                                     </div>
