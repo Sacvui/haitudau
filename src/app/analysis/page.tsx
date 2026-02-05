@@ -29,6 +29,8 @@ export default function AnalysisPage() {
     const [chartData, setChartData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [timeRange, setTimeRange] = useState(12); // Months
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Add Symbol
     const addSymbol = (symbol: string) => {
@@ -225,25 +227,57 @@ export default function AnalysisPage() {
                         </div>
                     ))}
 
-                    {/* Add Button Dropdown (Simplified) */}
-                    <div className="relative group">
-                        <Button variant="outline" size="sm" className="rounded-full border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-white/20">
+                    {/* Add Button Dropdown (Clickable) */}
+                    <div className="relative">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            className="rounded-full border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-white/20"
+                        >
                             <Plus className="w-4 h-4 mr-1" /> Thêm Mã
                         </Button>
-                        {/* Dropdown Content */}
-                        <div className="absolute top-full left-0 mt-2 w-64 bg-[#111827] border border-slate-700 rounded-xl shadow-2xl p-2 hidden group-hover:block z-50">
-                            <div className="grid grid-cols-4 gap-1 max-h-60 overflow-y-auto custom-scrollbar">
-                                {STOCK_LIST.filter(s => !selectedSymbols.includes(s)).map(s => (
-                                    <button
-                                        key={s}
-                                        onClick={() => addSymbol(s)}
-                                        className="text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 p-2 rounded text-center"
-                                    >
-                                        {s}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+
+                        {isDropdownOpen && (
+                            <>
+                                {/* Overlay to close */}
+                                <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+
+                                {/* Dropdown Content */}
+                                <div className="absolute top-full left-0 mt-2 w-64 bg-[#111827] border border-slate-700 rounded-xl shadow-2xl p-2 z-50 animate-in zoom-in-95 duration-100">
+                                    <div className="mb-2 px-1">
+                                        <div className="flex items-center bg-slate-800 rounded px-2 py-1">
+                                            <Search className="w-3 h-3 text-slate-500 mr-2" />
+                                            <input
+                                                className="bg-transparent border-none text-xs text-white w-full outline-none placeholder-slate-600"
+                                                placeholder="Tìm kiếm..."
+                                                autoFocus
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-1 max-h-60 overflow-y-auto custom-scrollbar">
+                                        {STOCK_LIST
+                                            .filter(s => !selectedSymbols.includes(s))
+                                            .filter(s => s.includes(searchTerm))
+                                            .map(s => (
+                                                <button
+                                                    key={s}
+                                                    onClick={() => {
+                                                        addSymbol(s);
+                                                        setIsDropdownOpen(false);
+                                                        setSearchTerm('');
+                                                    }}
+                                                    className="text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 p-2 rounded text-center transition-colors"
+                                                >
+                                                    {s}
+                                                </button>
+                                            ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </GlassCard>
 
