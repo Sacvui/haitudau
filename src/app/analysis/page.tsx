@@ -171,18 +171,29 @@ export default function AnalysisPage() {
     // Custom Dot for Dividends
     const CustomizedDot = (props: any) => {
         const { cx, cy, payload, dataKey } = props;
-        const symbol = dataKey; // dataKey is just 'VNM', 'VIB' etc
+        const symbol = dataKey;
         const div = payload[`${symbol}_div`];
 
-        if (div) {
+        if (div && cx && cy) {
+            const isStock = div.type === 'stock';
             return (
-                <g transform={`translate(${cx},${cy})`}>
-                    <circle r="6" fill="#fbbf24" stroke="#fff" strokeWidth="1" />
-                    <text x="0" y="3" textAnchor="middle" fontSize="8" fill="#000" fontWeight="bold">$</text>
+                <g transform={`translate(${cx},${cy})`} style={{ pointerEvents: 'none' }}>
+                    {/* Outer glow */}
+                    <circle r="12" fill={isStock ? "#3b82f6" : "#fbbf24"} fillOpacity="0.3" />
+                    {/* Main circle */}
+                    <circle r="7" fill={isStock ? "#3b82f6" : "#fbbf24"} stroke="#fff" strokeWidth="2" />
+                    {/* Icon/Text */}
+                    <text x="0" y="3" textAnchor="middle" fontSize="9" fill="#000" fontWeight="900" style={{ pointerEvents: 'none' }}>
+                        {isStock ? 'P' : '$'}
+                    </text>
+                    {/* Label floating above (Optional) */}
+                    <text x="0" y="-12" textAnchor="middle" fontSize="10" fill="white" fontWeight="bold" stroke="black" strokeWidth="2" paintOrder="stroke">
+                        {isStock ? 'CP' : 'Tiền'}
+                    </text>
                 </g>
             );
         }
-        return null; // No dot usually, or <circle r="0" />
+        return null;
     };
 
     return (
