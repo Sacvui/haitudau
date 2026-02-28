@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import type { StockDataPoint } from '@/lib/types';
 
 // In-memory cache for stock history (30 minute TTL)
 const historyCache = new Map<string, { data: StockDataPoint[]; timestamp: number; source: string }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-
-interface StockDataPoint {
-    date: string;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-    adjustedClose: number;
-}
 
 // 1. SSI iBoard Source (Primary - Best Accuracy)
 async function fetchFromSSI(symbol: string, startTs: number, endTs: number) {
@@ -122,13 +113,15 @@ export async function GET(request: NextRequest) {
     const cached = historyCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
         console.log(`Cache hit for ${symbol}`);
-        return NextResponse.json({
+        const response = NextResponse.json({
             success: true,
             symbol,
             data: cached.data,
             total: cached.data.length,
             source: `${cached.source} (cached)`
         });
+        response.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=1800');
+        return response;
     }
 
     const startTs = new Date(startDate).getTime();
@@ -150,13 +143,15 @@ export async function GET(request: NextRequest) {
                 // Cache the result
                 historyCache.set(cacheKey, { data, timestamp: Date.now(), source: source.name });
                 console.log(`✓ ${source.name} success: ${data.length} records`);
-                return NextResponse.json({
+                const response = NextResponse.json({
                     success: true,
                     symbol,
                     data,
                     total: data.length,
                     source: source.name
                 });
+                response.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=1800');
+                return response;
             }
         } catch (err) {
             console.warn(`✗ ${source.name} failed:`, (err as Error).message);

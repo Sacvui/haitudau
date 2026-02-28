@@ -1,64 +1,20 @@
-import { StockDataPoint, DividendInfo, RotationConfig, RotationResult, RotationTransaction } from './types';
+import {
+    StockDataPoint,
+    DividendInfo,
+    RotationConfig,
+    RotationResult,
+    RotationTransaction,
+    InvestmentInput,
+    InvestmentResult,
+    TimelineEvent,
+    MonthlyPerformance,
+    YearlyPerformance,
+    MonteCarloResult,
+    DividendGrowth,
+} from './types';
 
-export interface InvestmentInput {
-    symbol: string;
-    initialAmount: number;
-    monthlyInvestment?: number; // DCA amount
-    startDate: string;
-    endDate: string;
-    reinvestDividends?: boolean; // Tái đầu tư cổ tức?
-}
-
-export interface InvestmentResult {
-    symbol: string;
-    initialInvestment: number;
-    totalInvested: number;
-    currentValue: number;
-    cashBalance: number; // Tiền mặt còn dư
-    totalShares: number;
-    averageCostPerShare: number;
-    currentPrice: number;
-    absoluteReturn: number;
-    percentageReturn: number;
-    annualizedReturn: number;
-    maxDrawdown: number; // Max Drawdown percentage (negative)
-    dividendsCashReceived: number;
-    dividendsStockReceived: number;
-    dividendsReinvested: number;
-    timeline: TimelineEvent[];
-    monthlyPerformance: MonthlyPerformance[];
-    yearlyPerformance: YearlyPerformance[];
-    bestMonthToBuy: { month: number; averageReturn: number }[];
-}
-
-export interface TimelineEvent {
-    date: string;
-    type: 'buy' | 'sell' | 'dividend_cash' | 'dividend_stock' | 'reinvest' | 'deposit';
-    description: string;
-    shares: number;
-    pricePerShare: number;
-    totalShares: number;
-    portfolioValue: number;
-    cashBalance: number;
-}
-
-export interface MonthlyPerformance {
-    month: string;
-    open: number;
-    close: number;
-    high: number;
-    low: number;
-    return: number;
-    portfolioValue: number;
-}
-
-export interface YearlyPerformance {
-    year: number;
-    startValue: number;
-    endValue: number;
-    return: number;
-    dividends: number;
-}
+// Re-export types that consumers of this module need
+export type { InvestmentInput, InvestmentResult, MonteCarloResult, DividendGrowth };
 
 // CONSTANTS
 const TAX_RATE_DIVIDEND = 0.05; // 5% thuế cổ tức tiền mặt
@@ -411,15 +367,7 @@ export function analyzeOptimalTiming(priceHistory: StockDataPoint[]) {
     };
 }
 
-export interface MonteCarloResult {
-    year: number;
-    percentiles: {
-        p10: number; // Worst case (10%)
-        p50: number; // Base case (Median)
-        p90: number; // Best case (90%)
-    };
-    simulations: number[][]; // (Optional) Raw data for scatter plot
-}
+
 
 /**
  * Run Monte Carlo Simulation for Investment Projection
@@ -485,11 +433,7 @@ export function runMonteCarloSimulation(
     return results;
 }
 
-export interface DividendGrowth {
-    cagr3Year: number;
-    cagr5Year: number;
-    years: { year: number; totalDividend: number; growth: number }[];
-}
+
 
 export function calculateDividendCAGR(dividends: DividendInfo[]): DividendGrowth {
     // 1. Group by Year

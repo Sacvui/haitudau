@@ -1,31 +1,9 @@
 import axios from 'axios';
+import { StockHistoryParams, StockDataPoint, DividendInfo } from './types';
 
 // API endpoints for Vietnamese stock data
 const CAFEF_API = 'https://s.cafef.vn/Ajax/PageNew/DataHistory/PriceHistory.ashx';
 const VNDIRECT_API = 'https://finfo-api.vndirect.com.vn/v4/stock_prices';
-
-export interface StockHistoryParams {
-    symbol: string;
-    startDate: string; // DD/MM/YYYY
-    endDate: string;   // DD/MM/YYYY
-}
-
-export interface StockDataPoint {
-    date: string;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-    adjustedClose: number;
-}
-
-export interface DividendInfo {
-    exDate: string;
-    type: 'cash' | 'stock';
-    value: number;
-    description: string;
-}
 
 // Fetch stock history from CafeF
 export async function fetchStockHistory(params: StockHistoryParams): Promise<StockDataPoint[]> {
@@ -44,14 +22,14 @@ export async function fetchStockHistory(params: StockHistoryParams): Promise<Sto
         });
 
         if (response.data && response.data.data) {
-            return response.data.data.map((item: any) => ({
-                date: item.date,
-                open: item.open * 1000,
-                high: item.high * 1000,
-                low: item.low * 1000,
-                close: item.close * 1000,
-                volume: item.nmVolume,
-                adjustedClose: item.adClose * 1000,
+            return response.data.data.map((item: Record<string, number | string>) => ({
+                date: item.date as string,
+                open: (item.open as number) * 1000,
+                high: (item.high as number) * 1000,
+                low: (item.low as number) * 1000,
+                close: (item.close as number) * 1000,
+                volume: item.nmVolume as number,
+                adjustedClose: (item.adClose as number) * 1000,
             }));
         }
         return [];
@@ -72,9 +50,9 @@ export async function fetchDividendHistory(symbol: string): Promise<DividendInfo
         });
 
         if (response.data && Array.isArray(response.data)) {
-            return response.data.map((item: any) => ({
+            return response.data.map((item: Record<string, string>) => ({
                 exDate: item.NgayGDKHQ,
-                type: item.LoaiDieuChinh?.includes('Cổ tức bằng tiền') ? 'cash' : 'stock',
+                type: item.LoaiDieuChinh?.includes('Cổ tức bằng tiền') ? 'cash' as const : 'stock' as const,
                 value: parseFloat(item.GiaTriDieuChinh) || 0,
                 description: item.NoiDung || '',
             }));
@@ -98,7 +76,7 @@ export async function fetchStockList(): Promise<{ symbol: string; name: string; 
         });
 
         if (response.data && response.data.data) {
-            return response.data.data.map((item: any) => ({
+            return response.data.data.map((item: Record<string, string>) => ({
                 symbol: item.code,
                 name: item.companyName,
                 exchange: item.exchange,

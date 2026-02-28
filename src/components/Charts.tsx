@@ -25,14 +25,7 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, BarChart3, Calendar, PieChart as PieIcon, Lightbulb, ArrowUp, ArrowDown, Coins, Gift } from 'lucide-react';
-
-interface TimelineEvent {
-    date: string;
-    type: 'buy' | 'sell' | 'dividend_cash' | 'dividend_stock' | 'reinvest' | 'deposit';
-    description: string;
-    totalShares: number;
-    portfolioValue: number;
-}
+import type { TimelineEvent } from '@/lib/types';
 
 interface AssetGrowthChartProps {
     data: {

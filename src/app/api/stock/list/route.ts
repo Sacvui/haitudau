@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
+interface StockListItem {
+    symbol: string;
+    name: string;
+    exchange: string;
+    industry?: string;
+}
+
 // Cache stock list for 24 hours
-let stockListCache: any[] | null = null;
+let stockListCache: StockListItem[] | null = null;
 let cacheTime: number = 0;
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -43,7 +50,7 @@ export async function GET(request: NextRequest) {
         });
 
         if (response.data?.data) {
-            stockListCache = response.data.data.map((item: any) => ({
+            stockListCache = response.data.data.map((item: Record<string, string>) => ({
                 symbol: item.code,
                 name: item.companyName || item.shortName || '',
                 exchange: item.exchange || 'UNKNOWN',
@@ -61,8 +68,9 @@ export async function GET(request: NextRequest) {
 
         throw new Error("No data from API");
 
-    } catch (error: any) {
-        console.warn('Stock API failed, using fallback:', error.message);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.warn('Stock API failed, using fallback:', message);
         // Fallback Logic
         const filteredFallback = search
             ? FALLBACK_STOCKS.filter(s => s.symbol.includes(search))

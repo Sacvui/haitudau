@@ -11,52 +11,12 @@ import { YearlyDetailTable } from '@/components/dashboard/YearlyDetailTable';
 import { NAVChart } from '@/components/dashboard/NAVChart';
 import { PriceChart, YearlyPerformanceChart, DividendBreakdown } from '@/components/Charts';
 import { GlassCard } from '@/components/ui/glass';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { calculateInvestment, calculateDividendCAGR } from '@/lib/investment-calculator';
 import { Menu, Search, Bell, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ValuationChart } from '@/components/ValuationChart';
-
-interface DividendEvent {
-  date: string;
-  type: 'cash' | 'stock';
-  value: number;
-  description?: string;
-}
-
-interface TimelineEvent {
-  date: string;
-  type: 'buy' | 'sell' | 'dividend_cash' | 'dividend_stock' | 'reinvest' | 'deposit';
-  description: string;
-  shares: number;
-  pricePerShare: number;
-  totalShares: number;
-  portfolioValue: number;
-  cashBalance: number;
-}
-
-interface InvestmentResult {
-  symbol: string;
-  currentValue: number;
-  totalInvested: number;
-  totalShares: number;
-  currentPrice: number;
-  absoluteReturn: number;
-  percentageReturn: number;
-  annualizedReturn: number;
-  dividendsCashReceived: number;
-  dividendsReinvested: number;
-  dividendsStockReceived: number;
-  timeline: TimelineEvent[];
-  monthlyPerformance: unknown[];
-  yearlyPerformance: { year: number; return: number; dividends: number }[];
-}
-
-interface PriceDataPoint {
-  date: string;
-  close: number;
-  savingsValue: number;
-  compareClose?: number;
-}
+import type { DividendEvent, TimelineEvent, InvestmentResult, PriceDataPoint } from '@/lib/types';
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
@@ -99,7 +59,7 @@ export default function DashboardPage() {
     const divJson = await divRes.json();
     const dividends = divJson.success ? divJson.data : [];
 
-    const formattedDividends = dividends.map((d: any) => ({
+    const formattedDividends = dividends.map((d: Record<string, string | number>) => ({
       ...d,
       description: d.description || "Cổ tức",
       date: d.exDate // Map exDate to date for Table component
@@ -108,7 +68,7 @@ export default function DashboardPage() {
     const investmentResult = calculateInvestment(
       { ...formData, symbol },
       prices,
-      formattedDividends.map((d: any) => ({ ...d, exDate: d.exDate || d.date })) // Ensure exDate exists for calculator
+      formattedDividends.map((d: Record<string, string | number>) => ({ ...d, exDate: (d.exDate || d.date) as string })) // Ensure exDate exists for calculator
     );
 
     return { result: { ...investmentResult, symbol } as InvestmentResult, prices, dividends: formattedDividends };
@@ -287,47 +247,51 @@ export default function DashboardPage() {
             {/* Charts Area */}
             {result ? (
               <>
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 pb-6">
-                  {/* Main NAV Chart */}
-                  <div className="xl:col-span-8">
-                    <NAVChart
-                      data={navData}
-                      height={420}
-                      symbol={result.symbol}
-                    />
+                <ErrorBoundary>
+                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 pb-6">
+                    {/* Main NAV Chart */}
+                    <div className="xl:col-span-8">
+                      <NAVChart
+                        data={navData}
+                        height={350}
+                        symbol={result.symbol}
+                      />
+                    </div>
+
+                    {/* Side Charts */}
+                    <div className="xl:col-span-4 space-y-4">
+                      {/* Dividend Breakdown Pie */}
+                      <DividendBreakdown
+                        cashDividends={result.dividendsCashReceived}
+                        stockDividends={result.dividendsStockReceived}
+                        reinvested={result.dividendsReinvested}
+                      />
+
+                      {/* Yearly Performance Bar */}
+                      <YearlyPerformanceChart
+                        data={result.yearlyPerformance}
+                        height={120}
+                        dividendGrowth={dividendGrowth}
+                      />
+
+                      {/* Dividend Table History */}
+                      <DividendTable dividends={dividendData} symbol={result.symbol} />
+                    </div>
                   </div>
-
-                  {/* Side Charts */}
-                  <div className="xl:col-span-4 space-y-4">
-                    {/* Dividend Breakdown Pie */}
-                    <DividendBreakdown
-                      cashDividends={result.dividendsCashReceived}
-                      stockDividends={result.dividendsStockReceived}
-                      reinvested={result.dividendsReinvested}
-                    />
-
-                    {/* Yearly Performance Bar */}
-                    <YearlyPerformanceChart
-                      data={result.yearlyPerformance}
-                      height={120}
-                      dividendGrowth={dividendGrowth}
-                    />
-
-                    {/* Dividend Table History */}
-                    <DividendTable dividends={dividendData} symbol={result.symbol} />
-                  </div>
-                </div>
+                </ErrorBoundary>
 
                 {/* Yearly Detail Table - Full Width */}
-                <div className="pb-10">
-                  <YearlyDetailTable
-                    timeline={result.timeline}
-                    compareTimeline={compareResult?.timeline}
-                    symbol={result.symbol}
-                    compareSymbol={compareResult?.symbol}
-                    initialInvestment={formData.initialAmount}
-                  />
-                </div>
+                <ErrorBoundary>
+                  <div className="pb-10">
+                    <YearlyDetailTable
+                      timeline={result.timeline}
+                      compareTimeline={compareResult?.timeline}
+                      symbol={result.symbol}
+                      compareSymbol={compareResult?.symbol}
+                      initialInvestment={formData.initialAmount}
+                    />
+                  </div>
+                </ErrorBoundary>
               </>
             ) : (
               <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 animate-in fade-in zoom-in duration-1000">

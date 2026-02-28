@@ -1,41 +1,70 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
-const DATA_FILE = path.join(process.cwd(), 'src/data/private-portfolio.json');
-
-// Interface cho Transaction
+// Interface cho Portfolio Item
 interface PortfolioItem {
-    id: string; // UUID
+    id: string;
+    user_id?: string;
     symbol: string;
     shares: number;
-    avgPrice: number;
+    avg_price: number;
     note: string;
     date: string;
+    created_at?: string;
 }
 
-// Helper: Read Data
-function readData(): PortfolioItem[] {
-    if (!fs.existsSync(DATA_FILE)) {
-        return [];
+// Create Supabase admin client for server-side operations
+function getSupabase() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    const key = serviceKey || anonKey;
+    if (!url || !key) {
+        return null;
     }
-    try {
-        const fileContent = fs.readFileSync(DATA_FILE, 'utf-8');
-        return JSON.parse(fileContent);
-    } catch (e) {
-        return [];
-    }
+    return createClient(url, key);
 }
 
-// Helper: Write Data
-function writeData(data: PortfolioItem[]) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
+// Fallback: In-memory storage for when Supabase is not configured
+let memoryStore: PortfolioItem[] = [];
 
 export async function GET(request: NextRequest) {
-    const data = readData();
-    return NextResponse.json({ success: true, data });
+    const supabase = getSupabase();
+
+    if (!supabase) {
+        // Fallback to memory store when Supabase is not configured
+        return NextResponse.json({ success: true, data: memoryStore, source: 'memory' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('portfolios')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Supabase portfolio read error:', error);
+            return NextResponse.json({ success: true, data: memoryStore, source: 'memory-fallback' });
+        }
+
+        // Map Supabase columns to frontend format
+        const items: PortfolioItem[] = (data || []).map((row: any) => ({
+            id: row.id,
+            symbol: row.symbol,
+            shares: row.shares,
+            avg_price: row.avg_price,
+            avgPrice: row.avg_price, // Alias for frontend compatibility
+            note: row.note || '',
+            date: row.date || row.created_at,
+        }));
+
+        return NextResponse.json({ success: true, data: items, source: 'supabase' });
+    } catch (e) {
+        console.error('Portfolio GET error:', e);
+        return NextResponse.json({ success: true, data: memoryStore, source: 'memory-fallback' });
+    }
 }
 
 export async function POST(request: NextRequest) {
@@ -43,28 +72,75 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { action, item, id } = body;
 
-        let currentData = readData();
+        const supabase = getSupabase();
 
-        if (action === 'add') {
-            // Add new item
-            const newItem: PortfolioItem = {
-                ...item,
-                id: Math.random().toString(36).substr(2, 9),
-                date: new Date().toISOString()
-            };
-            currentData.push(newItem);
-        } else if (action === 'update') {
-            // Update existing
-            currentData = currentData.map(p => p.id === item.id ? item : p);
-        } else if (action === 'delete') {
-            // Delete
-            currentData = currentData.filter(p => p.id !== id);
+        if (!supabase) {
+            // Fallback to memory store
+            if (action === 'add') {
+                const newItem: PortfolioItem = {
+                    ...item,
+                    id: Math.random().toString(36).substr(2, 9),
+                    date: new Date().toISOString()
+                };
+                memoryStore.push(newItem);
+            } else if (action === 'update') {
+                memoryStore = memoryStore.map(p => p.id === item.id ? item : p);
+            } else if (action === 'delete') {
+                memoryStore = memoryStore.filter(p => p.id !== id);
+            }
+            return NextResponse.json({ success: true, data: memoryStore, source: 'memory' });
         }
 
-        writeData(currentData);
-        return NextResponse.json({ success: true, data: currentData });
+        // Supabase operations
+        if (action === 'add') {
+            const { data, error } = await supabase
+                .from('portfolios')
+                .insert({
+                    symbol: item.symbol?.toUpperCase(),
+                    shares: Number(item.shares) || 0,
+                    avg_price: Number(item.avgPrice || item.avg_price) || 0,
+                    note: item.note || '',
+                    date: new Date().toISOString(),
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            return NextResponse.json({ success: true, data, action: 'added' });
+
+        } else if (action === 'update') {
+            const { data, error } = await supabase
+                .from('portfolios')
+                .update({
+                    symbol: item.symbol?.toUpperCase(),
+                    shares: Number(item.shares) || 0,
+                    avg_price: Number(item.avgPrice || item.avg_price) || 0,
+                    note: item.note || '',
+                })
+                .eq('id', item.id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return NextResponse.json({ success: true, data, action: 'updated' });
+
+        } else if (action === 'delete') {
+            const { error } = await supabase
+                .from('portfolios')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            return NextResponse.json({ success: true, action: 'deleted' });
+        }
+
+        return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
 
     } catch (e) {
-        return NextResponse.json({ success: false, error: 'Failed to save' }, { status: 500 });
+        console.error('Portfolio POST error:', e);
+        return NextResponse.json(
+            { success: false, error: 'Failed to save portfolio data' },
+            { status: 500 }
+        );
     }
 }

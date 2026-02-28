@@ -11,6 +11,11 @@ const config: Config = {
     // Classes are now auto-detected by content scanning
     theme: {
         extend: {
+            fontFamily: {
+                sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+                outfit: ['var(--font-outfit)', 'Outfit', 'sans-serif'],
+                dancing: ['var(--font-dancing)', 'Dancing Script', 'cursive'],
+            },
             colors: {
                 background: 'hsl(var(--background))',
                 foreground: 'hsl(var(--foreground))',

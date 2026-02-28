@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from '@/components/ui/Logo';
+import { useAuth } from '@/contexts/AuthContext';
 import {
     LayoutDashboard,
     LineChart,
@@ -15,7 +16,7 @@ import {
     Coins,
     Target,
     Calendar,
-    Lock, // Added Lock icon
+    Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,10 @@ const NAV_ITEMS = [
 
 export function Sidebar({ className }: SidebarProps) {
     const pathname = usePathname();
+    const { user, signOut, isConfigured } = useAuth();
+
+    const displayName = user?.email?.split('@')[0] || 'Guest';
+    const initials = displayName.substring(0, 2).toUpperCase();
 
     return (
         <div className={cn("flex flex-col h-full bg-[#0b1121] border-r border-slate-800/60 shadow-2xl relative overflow-hidden", className)}>
@@ -90,16 +95,26 @@ export function Sidebar({ className }: SidebarProps) {
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-[2px] shadow-lg shadow-indigo-500/20">
                             <div className="w-full h-full rounded-full bg-[#0b1121] flex items-center justify-center">
-                                <span className="font-bold text-sm text-white">Guest</span>
+                                <span className="font-bold text-sm text-white">{initials}</span>
                             </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-white truncate">Premium Account</p>
-                            <p className="text-[10px] text-emerald-400 font-medium tracking-wide">● Đang hoạt động</p>
+                            <p className="text-xs font-bold text-white truncate">{user ? displayName : 'Guest'}</p>
+                            <p className={`text-[10px] font-medium tracking-wide ${user ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                {user ? '● Đã đăng nhập' : '○ Chưa đăng nhập'}
+                            </p>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg">
-                            <LogOut className="w-4 h-4" />
-                        </Button>
+                        {user && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg"
+                                onClick={() => signOut()}
+                                title="Đăng xuất"
+                            >
+                                <LogOut className="w-4 h-4" />
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>

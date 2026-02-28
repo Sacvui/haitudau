@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import dividendsData from '@/data/dividends.json';
 
+import type { DividendInfo } from '@/lib/types';
+
 // Type for local dividend data
-const LOCAL_DIVIDENDS: Record<string, any[]> = dividendsData;
+const LOCAL_DIVIDENDS: Record<string, DividendInfo[]> = dividendsData as Record<string, DividendInfo[]>;
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -28,13 +30,13 @@ export async function GET(request: NextRequest) {
             });
 
             if (vciRes.data && Array.isArray(vciRes.data) && vciRes.data.length > 0) {
-                const dividends = vciRes.data.map((e: any) => ({
+                const dividends = vciRes.data.map((e: Record<string, string | number>) => ({
                     exDate: e.exDate || e.recordDate,
-                    type: e.cashValue > 0 ? 'cash' : 'stock',
-                    value: e.cashValue > 0 ? e.cashValue : (e.ratio ? parseFloat(e.ratio) * 100 : 0),
-                    description: e.description || e.content || '',
+                    type: (e.cashValue as number) > 0 ? 'cash' as const : 'stock' as const,
+                    value: (e.cashValue as number) > 0 ? e.cashValue as number : (e.ratio ? parseFloat(String(e.ratio)) * 100 : 0),
+                    description: (e.description || e.content || '') as string,
                     source: 'vci'
-                })).filter((d: any) => d.value > 0);
+                })).filter((d: { value: number }) => d.value > 0);
 
                 if (dividends.length > 0) {
                     return NextResponse.json({
@@ -59,13 +61,13 @@ export async function GET(request: NextRequest) {
             });
 
             if (tcbsRes.data && tcbsRes.data.listDividendPaymentHis && tcbsRes.data.listDividendPaymentHis.length > 0) {
-                const dividends = tcbsRes.data.listDividendPaymentHis.map((e: any) => ({
-                    exDate: e.exerciseDate,
-                    type: e.issueMethod === 'cash' ? 'cash' : 'stock',
-                    value: e.issueMethod === 'cash' ? e.cashDividendPercentage * 100 : e.stockDividendPercentage * 100,
-                    description: e.title || '',
+                const dividends = tcbsRes.data.listDividendPaymentHis.map((e: Record<string, string | number>) => ({
+                    exDate: e.exerciseDate as string,
+                    type: e.issueMethod === 'cash' ? 'cash' as const : 'stock' as const,
+                    value: e.issueMethod === 'cash' ? (e.cashDividendPercentage as number) * 100 : (e.stockDividendPercentage as number) * 100,
+                    description: (e.title || '') as string,
                     source: 'tcbs'
-                })).filter((d: any) => d.value > 0);
+                })).filter((d: { value: number }) => d.value > 0);
 
                 if (dividends.length > 0) {
                     return NextResponse.json({
@@ -102,8 +104,9 @@ export async function GET(request: NextRequest) {
             message: `No dividend data available for ${symbol}. Consider adding to local database.`
         });
 
-    } catch (error: any) {
-        console.error('Dividend API Error:', error.message);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Dividend API Error:', message);
 
         // Final fallback to local data on any error
         if (LOCAL_DIVIDENDS[symbol]) {
@@ -117,7 +120,7 @@ export async function GET(request: NextRequest) {
         }
 
         return NextResponse.json(
-            { error: 'Failed to fetch dividend data', details: error.message },
+            { error: 'Failed to fetch dividend data', details: message },
             { status: 500 }
         );
     }

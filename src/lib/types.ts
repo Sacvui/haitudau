@@ -1,5 +1,7 @@
 // Shared types for the Stock Analyzer application
 
+// --- FORM & INPUT TYPES ---
+
 export interface FormDataType {
     symbol: string;
     startDate: string;
@@ -8,6 +10,23 @@ export interface FormDataType {
     monthlyInvestment: number;
     reinvestDividends: boolean;
 }
+
+export interface StockHistoryParams {
+    symbol: string;
+    startDate: string; // DD/MM/YYYY
+    endDate: string;   // DD/MM/YYYY
+}
+
+export interface InvestmentInput {
+    symbol: string;
+    initialAmount: number;
+    monthlyInvestment?: number; // DCA amount
+    startDate: string;
+    endDate: string;
+    reinvestDividends?: boolean; // Tái đầu tư cổ tức?
+}
+
+// --- STOCK DATA TYPES ---
 
 export interface StockDataPoint {
     date: string;
@@ -26,18 +45,28 @@ export interface DividendInfo {
     description: string;
 }
 
-export interface InvestmentResultData {
+export interface Stock {
+    symbol: string;
+    name: string;
+    exchange: string;
+    sector?: string; // e.g. 'Bank', 'Tech', 'Steel'
+}
+
+// --- INVESTMENT RESULT TYPES ---
+
+export interface InvestmentResult {
     symbol: string;
     initialInvestment: number;
     totalInvested: number;
     currentValue: number;
-    cashBalance: number;
+    cashBalance: number; // Tiền mặt còn dư
     totalShares: number;
     averageCostPerShare: number;
     currentPrice: number;
     absoluteReturn: number;
     percentageReturn: number;
     annualizedReturn: number;
+    maxDrawdown: number; // Max Drawdown percentage (negative)
     dividendsCashReceived: number;
     dividendsStockReceived: number;
     dividendsReinvested: number;
@@ -46,6 +75,9 @@ export interface InvestmentResultData {
     yearlyPerformance: YearlyPerformance[];
     bestMonthToBuy: { month: number; averageReturn: number }[];
 }
+
+/** @deprecated Use InvestmentResult instead */
+export type InvestmentResultData = InvestmentResult;
 
 export interface TimelineEvent {
     date: string;
@@ -66,7 +98,7 @@ export interface MonthlyPerformance {
     low: number;
     return: number;
     portfolioValue: number;
-    cashBalance: number;
+    cashBalance?: number;
 }
 
 export interface YearlyPerformance {
@@ -77,14 +109,42 @@ export interface YearlyPerformance {
     dividends: number;
 }
 
-export interface Stock {
-    symbol: string;
-    name: string;
-    exchange: string;
-    sector?: string; // e.g. 'Bank', 'Tech', 'Steel'
+// --- CHART DATA TYPES ---
+
+export interface PriceDataPoint {
+    date: string;
+    close: number;
+    savingsValue: number;
+    compareClose?: number;
 }
 
-// API Response types
+export interface DividendEvent {
+    date: string;
+    type: 'cash' | 'stock';
+    value: number;
+    description?: string;
+}
+
+// --- MONTE CARLO TYPES ---
+
+export interface MonteCarloResult {
+    year: number;
+    percentiles: {
+        p10: number; // Worst case (10%)
+        p50: number; // Base case (Median)
+        p90: number; // Best case (90%)
+    };
+    simulations: number[][]; // (Optional) Raw data for scatter plot
+}
+
+export interface DividendGrowth {
+    cagr3Year: number;
+    cagr5Year: number;
+    years: { year: number; totalDividend: number; growth: number }[];
+}
+
+// --- API RESPONSE TYPES ---
+
 export interface ApiResponse<T> {
     success: boolean;
     data?: T;
