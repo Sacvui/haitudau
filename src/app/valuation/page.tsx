@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
     Calculator, Search, TrendingUp, TrendingDown, Minus,
-    Shield, AlertTriangle, CheckCircle, XCircle, RefreshCw, Loader2, Menu, ChevronDown, ChevronUp
+    Shield, AlertTriangle, CheckCircle, XCircle, RefreshCw, Loader2, Menu, ChevronDown, ChevronUp, BarChart2
 } from 'lucide-react';
 import {
     runFullValuation,
     generateSensitivityTable,
+    calculateReverseDCF,
     type ValuationInput,
     type ValuationSummary,
     type ValuationResult
@@ -59,6 +60,10 @@ export default function ValuationPage() {
     const [sensitivity, setSensitivity] = useState<ReturnType<typeof generateSensitivityTable> | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
+    // Reverse DCF State
+    const [activeTab, setActiveTab] = useState<'intrinsic' | 'reverse' | 'peBand'>('intrinsic');
+    const [impliedGrowth, setImpliedGrowth] = useState<number | null>(null);
+
     // Custom params
     const [requiredReturn, setRequiredReturn] = useState(12);
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -70,6 +75,7 @@ export default function ValuationPage() {
         setValuation(null);
         setFundamentals(null);
         setSensitivity(null);
+        setImpliedGrowth(null);
 
         try {
             const res = await fetch(`/api/stock/fundamentals?symbol=${symbol.trim().toUpperCase()}`);
@@ -102,6 +108,10 @@ export default function ValuationPage() {
             const epsGrowth = Math.min(data.roe * 0.6, 25) / 100;
             const sensTable = generateSensitivityTable(data.eps, epsGrowth, requiredReturn / 100);
             setSensitivity(sensTable);
+
+            // Reverse DCF calculation
+            const impliedG = calculateReverseDCF(data.currentPrice, data.eps, requiredReturn / 100, 10, 0.03);
+            setImpliedGrowth(impliedG);
 
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi');
@@ -210,35 +220,218 @@ export default function ValuationPage() {
                         </Card>
                     )}
 
-                    {/* Results */}
+                    {/* Tabs */}
                     {valuation && fundamentals && (
+                        <div className="flex border-b border-slate-800 mt-6">
+                            <button
+                                onClick={() => setActiveTab('intrinsic')}
+                                className={`px-6 py-3 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'intrinsic'
+                                    ? 'border-indigo-500 text-indigo-400'
+                                    : 'border-transparent text-slate-400 hover:text-slate-300'
+                                    }`}
+                            >
+                                <Calculator className="w-4 h-4" /> Định Giá Cơ Bản
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('reverse')}
+                                className={`px-6 py-3 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'reverse'
+                                    ? 'border-purple-500 text-purple-400'
+                                    : 'border-transparent text-slate-400 hover:text-slate-300'
+                                    }`}
+                            >
+                                <Shield className="w-4 h-4" /> Máy Tính Niềm Tin
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('peBand')}
+                                className={`px-6 py-3 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'peBand'
+                                        ? 'border-amber-500 text-amber-400'
+                                        : 'border-transparent text-slate-400 hover:text-slate-300'
+                                    }`}
+                            >
+                                <BarChart2 className="w-4 h-4" /> P/E Band
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Results - Intrinsic */}
+                    {valuation && fundamentals && activeTab === 'intrinsic' && (
                         <ErrorBoundary>
-                            {/* Summary Card */}
                             <SummaryCard valuation={valuation} fundamentals={fundamentals} />
 
-                            {/* Conviction Dashboard / Health Indicators */}
                             <div className="mt-6">
                                 <ConvictionDashboard data={fundamentals} />
                             </div>
 
-                            {/* Fundamentals Overview */}
                             <div className="mt-6">
                                 <FundamentalsGrid fundamentals={fundamentals} />
                             </div>
 
-                            {/* 4 Method Cards */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
                                 {valuation.results.map((result) => (
                                     <MethodCard key={result.methodKey} result={result} currentPrice={fundamentals.currentPrice} />
                                 ))}
                             </div>
 
-                            {/* Sensitivity Table */}
                             {sensitivity && fundamentals.eps > 0 && (
                                 <div className="mt-6">
                                     <SensitivityTable data={sensitivity} currentPrice={fundamentals.currentPrice} />
                                 </div>
                             )}
+                        </ErrorBoundary>
+                    )}
+
+                    {/* Results - Reverse DCF */}
+                    {valuation && fundamentals && activeTab === 'reverse' && (
+                        <ErrorBoundary>
+                            <Card className="bg-[#111827] border-slate-800 mt-6 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-32 bg-purple-500/5 blur-3xl rounded-full mix-blend-screen pointer-events-none"></div>
+                                <CardContent className="p-8 text-center relative z-10">
+                                    <h2 className="text-xl font-bold text-slate-200 mb-2">Mức Tăng Trưởng Kỳ Vọng (Reverse DCF)</h2>
+                                    <p className="text-sm text-slate-400 max-w-2xl mx-auto mb-6">
+                                        Với mức giá thị trường <strong className="text-white">{fundamentals.currentPrice.toLocaleString()}đ</strong>
+                                        {' '}và lãi suất chiết khấu <strong className="text-white">{requiredReturn}%</strong>,
+                                        thị trường đang ngầm kỳ vọng doanh nghiệp phải duy trì mức tăng trưởng lợi nhuận là:
+                                    </p>
+
+                                    <div className="flex justify-center mb-8">
+                                        <div className="px-12 py-6 bg-slate-900/50 border border-slate-700/80 rounded-3xl inline-flex flex-col items-center shadow-lg shadow-black/20">
+                                            <span className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 drop-shadow-sm">
+                                                {impliedGrowth !== null ? (impliedGrowth * 100).toFixed(1) + '%' : 'N/A'}
+                                            </span>
+                                            <span className="text-[10px] text-slate-500 font-bold tracking-[0.2em] uppercase mt-3">Tăng trưởng kép mỗi năm (10 năm tới)</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto text-left">
+                                        <div className="p-5 bg-slate-800/40 rounded-2xl border border-slate-700/50">
+                                            <p className="text-[11px] text-slate-400 font-bold uppercase mb-2">Tăng trưởng LN 5 năm qua</p>
+                                            <p className="text-2xl font-bold text-slate-200">{fundamentals.profitGrowth.toFixed(1)}%</p>
+                                            <p className="text-xs text-slate-500 mt-1">Dữ liệu lịch sử thực tế</p>
+                                        </div>
+                                        <div className="p-5 bg-slate-800/40 rounded-2xl border border-slate-700/50">
+                                            <p className="text-[11px] text-slate-400 font-bold uppercase mb-2">Tỷ suất lợi nhuận (ROE)</p>
+                                            <p className="text-2xl font-bold text-slate-200">{fundamentals.roe.toFixed(1)}%</p>
+                                            <p className="text-xs text-slate-500 mt-1">Khả năng sinh lời hiện tại</p>
+                                        </div>
+                                        <div className="p-5 bg-slate-800/40 rounded-2xl border border-slate-700/50 flex flex-col justify-center">
+                                            <p className="text-[11px] text-slate-400 font-bold uppercase mb-2">Nhận Định Niềm Tin</p>
+                                            {impliedGrowth !== null && (impliedGrowth * 100) > fundamentals.profitGrowth ? (
+                                                <div>
+                                                    <p className="text-sm font-bold text-rose-400 flex items-center gap-1">
+                                                        <AlertTriangle className="w-4 h-4" /> KỲ VỌNG CAO
+                                                    </p>
+                                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                                        Thị trường đòi hỏi mức tăng trưởng cao hơn những gì lịch sử làm được. Có rủi ro.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <p className="text-sm font-bold text-emerald-400 flex items-center gap-1">
+                                                        <CheckCircle className="w-4 h-4" /> BI QUAN / THẾ THƯỢNG PHONG
+                                                    </p>
+                                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                                        Chỉ cần tiếp tục giữ phong độ lịch sử là nhà đầu tư đã dễ dàng có lãi.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8 text-left max-w-4xl mx-auto bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4">
+                                        <h3 className="text-sm font-bold text-indigo-300 mb-1 flex items-center gap-2">
+                                            <Shield className="w-4 h-4" /> Reverse DCF là gì?
+                                        </h3>
+                                        <p className="text-xs text-indigo-200/70 leading-relaxed">
+                                            Thay vì dự đoán tương lai để tìm ra giá trị nội tại (rất dễ sai lầm), Reverse DCF đảo ngược phương trình: dùng giá trị thật trên sàn để tìm ra <strong>Thị trường đang dự đoán gì?</strong> Nếu bạn tin rằng doanh nghiệp có thể tăng trưởng cao hơn mức kỳ vọng này, cổ phiếu đó đang rẻ.
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </ErrorBoundary>
+                    )}
+
+                    {/* Results - P/E Band */}
+                    {valuation && fundamentals && activeTab === 'peBand' && (
+                        <ErrorBoundary>
+                            <Card className="bg-[#111827] border-slate-800 mt-6 relative overflow-hidden">
+                                <div className="absolute bottom-0 left-0 p-32 bg-amber-500/5 blur-3xl rounded-full mix-blend-screen pointer-events-none"></div>
+                                <CardContent className="p-8 relative z-10">
+                                    <h2 className="text-xl font-bold text-slate-200 mb-2 text-center">Khung Định Giá P/E Band</h2>
+                                    <p className="text-sm text-slate-400 max-w-2xl mx-auto mb-8 text-center">
+                                        So sánh giá hiện tại <strong className="text-white">{fundamentals.currentPrice.toLocaleString()}đ</strong> với các mức giá tương ứng khi P/E ở ngưỡng Rẻ, Hợp lý, Đắt, và Bong bóng.
+                                    </p>
+
+                                    {fundamentals.eps > 0 ? (() => {
+                                        const eps = fundamentals.eps;
+                                        const currentPE = fundamentals.pe;
+                                        const price = fundamentals.currentPrice;
+                                        const bands = [
+                                            { label: 'Rẻ (P/E 8)', pe: 8, color: 'emerald', value: eps * 8 },
+                                            { label: 'Hợp lý (P/E 12)', pe: 12, color: 'sky', value: eps * 12 },
+                                            { label: 'Trung bình (P/E 15)', pe: 15, color: 'amber', value: eps * 15 },
+                                            { label: 'Đắt (P/E 20)', pe: 20, color: 'orange', value: eps * 20 },
+                                            { label: 'Bong bóng (P/E 25)', pe: 25, color: 'rose', value: eps * 25 },
+                                        ];
+                                        const maxVal = Math.max(...bands.map(b => b.value), price);
+
+                                        return (
+                                            <div className="space-y-4">
+                                                {bands.map(band => {
+                                                    const pct = (band.value / maxVal) * 100;
+                                                    const pricePct = (price / maxVal) * 100;
+                                                    const isAbove = price > band.value;
+                                                    const colorMap: Record<string, string> = {
+                                                        emerald: 'bg-emerald-500', sky: 'bg-sky-500', amber: 'bg-amber-500', orange: 'bg-orange-500', rose: 'bg-rose-500',
+                                                    };
+                                                    const textColorMap: Record<string, string> = {
+                                                        emerald: 'text-emerald-400', sky: 'text-sky-400', amber: 'text-amber-400', orange: 'text-orange-400', rose: 'text-rose-400',
+                                                    };
+                                                    return (
+                                                        <div key={band.label}>
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <span className={`text-xs font-bold ${textColorMap[band.color]}`}>{band.label}</span>
+                                                                <span className="text-xs text-slate-400 font-mono">{band.value.toLocaleString()}đ</span>
+                                                            </div>
+                                                            <div className="relative h-6 bg-slate-800/80 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full ${colorMap[band.color]}/30 rounded-full transition-all duration-500`}
+                                                                    style={{ width: `${pct}%` }}
+                                                                />
+                                                                {/* Current price marker */}
+                                                                <div
+                                                                    className="absolute top-0 h-full w-0.5 bg-white/80 shadow-lg shadow-white/30"
+                                                                    style={{ left: `${Math.min(pricePct, 100)}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+
+                                                {/* Legend */}
+                                                <div className="flex items-center justify-center gap-2 mt-6 text-xs text-slate-400">
+                                                    <div className="w-4 h-0.5 bg-white/80"></div>
+                                                    <span>Giá hiện tại ({price.toLocaleString()}đ · P/E {currentPE.toFixed(1)}x)</span>
+                                                </div>
+
+                                                {/* Interpretation */}
+                                                <div className="mt-4 bg-slate-800/40 rounded-xl p-4 border border-slate-700/50">
+                                                    <p className="text-sm text-slate-300">
+                                                        {currentPE <= 10 && '🟢 Cổ phiếu đang ở vùng GIÁ RẺ. Phù hợp cho chiến lược Value Investing tích lũy dài hạn.'}
+                                                        {currentPE > 10 && currentPE <= 15 && '🟡 Cổ phiếu đang ở vùng GIÁ HỢP LÝ. Có thể cân nhắc mua nếu kỳ vọng tăng trưởng tốt.'}
+                                                        {currentPE > 15 && currentPE <= 22 && '🟠 Cổ phiếu đang ở vùng GIÁ CAO. Cẩn trọng — chỉ nên mua nếu đây là cổ phiếu tăng trưởng với ROE cao.'}
+                                                        {currentPE > 22 && '🔴 Cổ phiếu đang ở vùng BONG BÓNG. Rủi ro điều chỉnh rất cao. Nên xem xét chốt lời hoặc đợi giá điều chỉnh.'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })() : (
+                                        <div className="text-center py-12 text-slate-500">
+                                            <AlertTriangle className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                                            <p className="text-sm">Không thể hiển thị P/E Band — EPS không hợp lệ (âm hoặc bằng 0).</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
                         </ErrorBoundary>
                     )}
 

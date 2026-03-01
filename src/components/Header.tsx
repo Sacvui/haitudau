@@ -36,7 +36,7 @@ export default function Header() {
                         </Button>
                         {isConfigured && (
                             <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white" asChild>
-                                <Link href="/history">Lịch sử</Link>
+                                <Link href="/portfolio">Két sắt (Portfolio)</Link>
                             </Button>
                         )}
                         <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white" asChild>
@@ -78,12 +78,12 @@ export default function Header() {
                                                     <p className="text-sm font-medium truncate text-white">{user.email}</p>
                                                 </div>
                                                 <Link
-                                                    href="/history"
+                                                    href="/portfolio"
                                                     onClick={() => setShowDropdown(false)}
                                                     className="flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg text-slate-300 hover:bg-white/5 hover:text-white"
                                                 >
                                                     <History className="w-4 h-4" />
-                                                    Lịch sử phân tích
+                                                    Két Sắt Cá Nhân
                                                 </Link>
                                                 <button
                                                     onClick={() => { signOut(); setShowDropdown(false); }}
@@ -126,7 +126,7 @@ export default function Header() {
                         </Button>
                         {isConfigured && (
                             <Button variant="ghost" className="w-full justify-start text-slate-300" asChild>
-                                <Link href="/history" onClick={() => setMobileMenuOpen(false)}>Lịch sử</Link>
+                                <Link href="/portfolio" onClick={() => setMobileMenuOpen(false)}>Két sắt (Portfolio)</Link>
                             </Button>
                         )}
                         <Button variant="ghost" className="w-full justify-start text-slate-400" asChild>

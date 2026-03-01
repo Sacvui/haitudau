@@ -59,6 +59,8 @@ export const viewport: Viewport = {
   themeColor: "#0f172a",
 };
 
+import { GlobalNav } from "@/components/GlobalNav";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -66,8 +68,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className={`dark ${inter.variable} ${outfit.variable} ${dancingScript.variable}`} suppressHydrationWarning>
-      <body className="bg-[#0f172a] text-slate-100 antialiased overflow-y-auto lg:overflow-hidden selection:bg-indigo-500/30 h-full w-full font-sans" suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+      <body className="bg-[#0f172a] text-slate-100 antialiased overflow-y-auto lg:overflow-hidden selection:bg-indigo-500/30 h-full w-full font-sans flex flex-col" suppressHydrationWarning>
+        <AuthProvider>
+          <GlobalNav />
+          <div className="flex-1 overflow-auto">
+            {children}
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );

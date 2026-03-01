@@ -40,21 +40,33 @@ export function NAVChart({ data, compareData, height = 350, symbol, compareSymbo
         );
     }
 
-    // Build a map from compareData by date for efficient lookup
+    const dateSet = new Set<string>();
+    const dataMap = new Map<string, NAVDataPoint>();
+
+    data.forEach(d => {
+        dateSet.add(d.date);
+        dataMap.set(d.date, d);
+    });
+
     const compareMap = new Map<string, number>();
     if (compareData && compareData.length > 0) {
-        compareData.forEach(d => compareMap.set(d.date, d.portfolioValue));
+        compareData.forEach(d => {
+            dateSet.add(d.date);
+            compareMap.set(d.date, d.portfolioValue);
+        });
     }
 
-    const chartData = data.map((d) => {
-        const compareValue = compareMap.get(d.date);
+    const sortedDates = Array.from(dateSet).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+    const chartData = sortedDates.map(date => {
+        const d = dataMap.get(date);
+        const compVal = compareMap.get(date);
         return {
-            ...d,
-            date: format(new Date(d.date), 'dd/MM/yy'),
-            valueM: d.portfolioValue / 1e6,
-            costM: d.totalCost / 1e6,
-            savingsM: d.savingsValue / 1e6,
-            compareM: compareValue ? compareValue / 1e6 : undefined,
+            date: format(new Date(date), 'dd/MM/yy'),
+            valueM: d !== undefined ? d.portfolioValue / 1e6 : null,
+            costM: d !== undefined ? d.totalCost / 1e6 : null,
+            savingsM: d !== undefined ? d.savingsValue / 1e6 : null,
+            compareM: compVal !== undefined ? compVal / 1e6 : null,
         };
     });
 
@@ -67,12 +79,13 @@ export function NAVChart({ data, compareData, height = 350, symbol, compareSymbo
     const percentageReturn = totalCost > 0 ? ((endValue - totalCost) / totalCost * 100) : 0;
 
     const allValues = chartData.flatMap(d => {
-        const vals = [d.valueM, d.costM, d.savingsM];
-        if (d.compareM !== undefined) vals.push(d.compareM);
+        const vals: (number | null)[] = [d.valueM, d.costM, d.savingsM];
+        if (d.compareM !== null) vals.push(d.compareM);
         return vals;
-    });
-    const minValue = Math.min(...allValues);
-    const maxValue = Math.max(...allValues);
+    }).filter((v): v is number => v !== null);
+
+    const minValue = allValues.length > 0 ? Math.min(...allValues) : 0;
+    const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
     const padding = (maxValue - minValue) * 0.1;
 
     return (
@@ -166,6 +179,7 @@ export function NAVChart({ data, compareData, height = 350, symbol, compareSymbo
                             strokeDasharray="5 5"
                             fill="none"
                             dot={false}
+                            connectNulls
                         />
 
                         {/* Cost area */}
@@ -176,6 +190,7 @@ export function NAVChart({ data, compareData, height = 350, symbol, compareSymbo
                             strokeWidth={1.5}
                             fill="url(#costGradient)"
                             dot={false}
+                            connectNulls
                         />
 
                         {/* Portfolio value area */}
@@ -186,6 +201,7 @@ export function NAVChart({ data, compareData, height = 350, symbol, compareSymbo
                             strokeWidth={2}
                             fill="url(#navGradient)"
                             dot={false}
+                            connectNulls
                         />
 
                         {/* Compare stock area */}

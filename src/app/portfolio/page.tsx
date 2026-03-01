@@ -1,11 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { GlassCard } from '@/components/ui/glass';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Lock, Unlock, Plus, Trash2, Edit2, Save, X, Eye, EyeOff } from 'lucide-react';
+import { Lock, Unlock, Plus, Trash2, Edit2, Save, X, Eye, EyeOff, History, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+
+import { useAuth } from '@/contexts/AuthContext';
+import { createBrowserClient } from '@supabase/ssr';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
 
 interface PortfolioItem {
     id: string;
@@ -22,30 +27,111 @@ interface StockPrice {
     change: number;
 }
 
+interface ResultData {
+    percentageReturn?: number;
+    currentValue?: number;
+}
+
+interface SavedAnalysis {
+    id: string;
+    symbol: string;
+    initial_investment: number;
+    start_date: string;
+    end_date: string;
+    result_data: ResultData;
+    created_at: string;
+}
+
+function createSupabaseClient() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url || !key) {
+        return null;
+    }
+
+    return createBrowserClient(url, key);
+}
+
 export default function PrivatePortfolioPage() {
-    // Auth State
+    // Parent Auth & Context
+    const { user } = useAuth();
+    const supabase = useMemo(() => createSupabaseClient(), []);
+
+    // Auth State (Local Vault)
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [password, setPassword] = useState('');
 
-    // Data State
+    // Tab State
+    const [activeTab, setActiveTab] = useState<'holdings' | 'history'>('holdings');
+
+    // Data State (Holdings)
     const [items, setItems] = useState<PortfolioItem[]>([]);
     const [prices, setPrices] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(false);
 
-    // Edit/Add State
+    // Data State (History)
+    const [analyses, setAnalyses] = useState<SavedAnalysis[]>([]);
+
+    // Edit/Add State (Holdings)
     const [isAdding, setIsAdding] = useState(false);
     const [newItem, setNewItem] = useState({ symbol: '', shares: '', avgPrice: '', note: '' });
 
-    // 1. Check Auth (Simple Session)
+    // 1. Check Vault Session & Fetch Initial Data
     useEffect(() => {
-        const auth = sessionStorage.getItem('private_auth');
-        if (auth === 'true') {
+        const vaultAuth = sessionStorage.getItem('private_auth');
+        if (vaultAuth === 'true') {
             setIsAuthenticated(true);
             fetchPortfolio();
         }
-    }, []);
 
-    // 2. Fetch Portfolio & Prices
+        if (user) {
+            loadAnalyses();
+        }
+    }, [user]);
+
+    const loadAnalyses = async () => {
+        if (!supabase) return;
+        try {
+            const { data, error } = await supabase
+                .from('user_portfolios')
+                .select('*')
+                .eq('user_id', user?.id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setAnalyses(data || []);
+        } catch (error) {
+            console.error('Error loading analyses:', error);
+        }
+    };
+
+    const deleteAnalysis = async (id: string) => {
+        if (!supabase) return;
+        if (!confirm('Bạn có chắc muốn xóa điểm lưu mô phỏng này?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('user_portfolios')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            setAnalyses(prev => prev.filter((a) => a.id !== id));
+            toast.success('Đã xóa dữ liệu mô phỏng');
+        } catch (error) {
+            console.error('Error deleting analysis:', error);
+            toast.error('Lỗi khi xóa mô phỏng');
+        }
+    };
+
+    const formatCurrency = (value: number) => {
+        if (value >= 1000000000) return `${(value / 1000000000).toFixed(2)} tỷ`;
+        if (value >= 1000000) return `${(value / 1000000).toFixed(1)} tr`;
+        return value.toLocaleString('vi-VN');
+    };
+
+    // 2. Fetch Portfolio & Prices (Holdings)
     const fetchPortfolio = async () => {
         setLoading(true);
         try {
@@ -205,7 +291,7 @@ export default function PrivatePortfolioPage() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                            <span className="text-emerald-400">●</span> Private Portfolio
+                            <span className="text-emerald-400">●</span> Private Vault
                         </h1>
                         <p className="text-slate-400 mt-1 font-mono text-sm">/root/user/assets/tracking</p>
                     </div>
@@ -272,7 +358,7 @@ export default function PrivatePortfolioPage() {
                                     <label className="text-xs text-slate-400 block mb-1">Mã CP</label>
                                     <Input
                                         placeholder="VNM"
-                                        className="uppercase font-mono bg-black/30 border-slate-700"
+                                        className="uppercase font-mono bg-black/30 border-slate-700 text-white"
                                         value={newItem.symbol}
                                         onChange={e => setNewItem({ ...newItem, symbol: e.target.value })}
                                         autoFocus
@@ -283,7 +369,7 @@ export default function PrivatePortfolioPage() {
                                     <Input
                                         type="number"
                                         placeholder="1000"
-                                        className="font-mono bg-black/30 border-slate-700"
+                                        className="font-mono bg-black/30 border-slate-700 text-white"
                                         value={newItem.shares}
                                         onChange={e => setNewItem({ ...newItem, shares: e.target.value })}
                                     />
@@ -293,7 +379,7 @@ export default function PrivatePortfolioPage() {
                                     <Input
                                         type="number"
                                         placeholder="65000"
-                                        className="font-mono bg-black/30 border-slate-700"
+                                        className="font-mono bg-black/30 border-slate-700 text-white"
                                         value={newItem.avgPrice}
                                         onChange={e => setNewItem({ ...newItem, avgPrice: e.target.value })}
                                     />
@@ -302,16 +388,16 @@ export default function PrivatePortfolioPage() {
                                     <label className="text-xs text-slate-400 block mb-1">Ghi chú</label>
                                     <Input
                                         placeholder="Mua tích sản tháng 2..."
-                                        className="bg-black/30 border-slate-700"
+                                        className="bg-black/30 border-slate-700 text-white"
                                         value={newItem.note}
                                         onChange={e => setNewItem({ ...newItem, note: e.target.value })}
                                     />
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button className="flex-1 bg-emerald-600 hover:bg-emerald-500" onClick={handleAdd}>
+                                    <Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white" onClick={handleAdd}>
                                         <Save className="w-4 h-4" />
                                     </Button>
-                                    <Button variant="ghost" className="px-3 hover:bg-white/10" onClick={() => setIsAdding(false)}>
+                                    <Button variant="ghost" className="px-3 hover:bg-white/10 text-white" onClick={() => setIsAdding(false)}>
                                         <X className="w-4 h-4" />
                                     </Button>
                                 </div>
@@ -320,71 +406,203 @@ export default function PrivatePortfolioPage() {
                     </div>
                 )}
 
-                {/* Portfolio Table */}
-                <GlassCard className="overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-white/5 bg-white/[0.02]">
-                                    <th className="p-4 text-left font-bold text-slate-400 uppercase text-xs">Mã Assets</th>
-                                    <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Số Lượng</th>
-                                    <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Giá Vốn</th>
-                                    <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Thị Giá</th>
-                                    <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Tổng Giá Trị</th>
-                                    <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Lãi/Lỗ</th>
-                                    <th className="p-4 text-left font-bold text-slate-400 uppercase text-xs">Note</th>
-                                    <th className="p-4 text-center font-bold text-slate-400 uppercase text-xs">Xóa</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {items.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={8} className="p-8 text-center text-slate-500">
-                                            Két sắt đang trống. Hãy thêm tài sản đầu tiên!
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    items.map(item => {
-                                        const currentPrice = prices[item.symbol] || item.avgPrice; // Use avgPrice if no realtime data
-                                        const marketValue = item.shares * currentPrice;
-                                        const costValue = item.shares * item.avgPrice;
-                                        const profit = marketValue - costValue;
-                                        const profitPercent = (profit / costValue) * 100;
-
-                                        return (
-                                            <tr key={item.id} className="hover:bg-white/[0.02] transition-colors group">
-                                                <td className="p-4 font-bold text-white text-base">{item.symbol}</td>
-                                                <td className="p-4 text-right font-mono text-slate-300">{item.shares.toLocaleString()}</td>
-                                                <td className="p-4 text-right font-mono text-slate-400">{item.avgPrice.toLocaleString()}</td>
-                                                <td className="p-4 text-right font-mono text-white font-medium">{currentPrice.toLocaleString()}</td>
-                                                <td className="p-4 text-right font-mono text-white font-bold">{(marketValue / 1e6).toFixed(1)} <span className="text-slate-600 text-xs">M</span></td>
-                                                <td className="p-4 text-right">
-                                                    <div className={`font-mono font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                        {profit >= 0 ? '+' : ''}{(profit / 1e6).toFixed(1)} M
-                                                    </div>
-                                                    <div className={`text-[10px] ${profit >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}`}>
-                                                        {profitPercent.toFixed(1)}%
-                                                    </div>
-                                                </td>
-                                                <td className="p-4 text-slate-500 italic max-w-xs truncate">{item.note}</td>
-                                                <td className="p-4 text-center">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-8 w-8 p-0 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all"
-                                                        onClick={() => handleDelete(item.id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
+                {/* Portfolio Content */}
+                <div className="mt-8">
+                    {/* Simplified Tabs without complex Headless UI for fast MVP */}
+                    <div className="flex border-b border-white/10 mb-6 gap-2">
+                        <button
+                            className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'holdings' ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5' : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                            onClick={() => setActiveTab('holdings')}
+                        >
+                            Tài Sản Nắm Giữ
+                        </button>
+                        <button
+                            className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'history' ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5' : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                            onClick={() => setActiveTab('history')}
+                        >
+                            Lịch Sử Mô Phỏng
+                        </button>
                     </div>
-                </GlassCard>
+
+                    {activeTab === 'holdings' && (
+                        <div className="animate-in fade-in duration-300">
+                            <GlassCard className="overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-white/5 bg-white/[0.02]">
+                                                <th className="p-4 text-left font-bold text-slate-400 uppercase text-xs">Mã Assets</th>
+                                                <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Số Lượng</th>
+                                                <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Giá Vốn</th>
+                                                <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Thị Giá</th>
+                                                <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Tổng Giá Trị</th>
+                                                <th className="p-4 text-right font-bold text-slate-400 uppercase text-xs">Lãi/Lỗ</th>
+                                                <th className="p-4 text-left font-bold text-slate-400 uppercase text-xs">Note</th>
+                                                <th className="p-4 text-center font-bold text-slate-400 uppercase text-xs">Xóa</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {items.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={8} className="p-8 text-center text-slate-500">
+                                                        Két sắt đang trống. Hãy ghi chép tài sản đầu tư vững bền!
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                items.map(item => {
+                                                    const currentPrice = prices[item.symbol] || item.avgPrice; // Use avgPrice if no realtime data
+                                                    const marketValue = item.shares * currentPrice;
+                                                    const costValue = item.shares * item.avgPrice;
+                                                    const profit = marketValue - costValue;
+                                                    const profitPercent = (profit / costValue) * 100;
+
+                                                    return (
+                                                        <tr key={item.id} className="hover:bg-white/[0.02] transition-colors group">
+                                                            <td className="p-4 font-bold text-white text-base">{item.symbol}</td>
+                                                            <td className="p-4 text-right font-mono text-slate-300">{item.shares.toLocaleString()}</td>
+                                                            <td className="p-4 text-right font-mono text-slate-400">{item.avgPrice.toLocaleString()}</td>
+                                                            <td className="p-4 text-right font-mono text-white font-medium">{currentPrice.toLocaleString()}</td>
+                                                            <td className="p-4 text-right font-mono text-white font-bold">{(marketValue / 1e6).toFixed(1)} <span className="text-slate-600 text-xs">M</span></td>
+                                                            <td className="p-4 text-right">
+                                                                <div className={`font-mono font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                                    {profit >= 0 ? '+' : ''}{(profit / 1e6).toFixed(1)} M
+                                                                </div>
+                                                                <div className={`text-[10px] ${profit >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}`}>
+                                                                    {profitPercent.toFixed(1)}%
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-4 text-slate-500 italic max-w-xs truncate">{item.note}</td>
+                                                            <td className="p-4 text-center">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-8 w-8 p-0 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                                                                    onClick={() => handleDelete(item.id)}
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </GlassCard>
+                        </div>
+                    )}
+
+                    {activeTab === 'history' && (
+                        <div className="animate-in fade-in duration-300">
+                            {user ? (
+                                analyses.length === 0 ? (
+                                    <GlassCard className="p-12 text-center border-dashed border-slate-700 bg-transparent">
+                                        <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center mx-auto mb-4 border border-slate-700">
+                                            <History className="w-8 h-8 text-slate-500" />
+                                        </div>
+                                        <h2 className="text-lg font-medium text-slate-300 mb-2">Chưa có phân tích nào</h2>
+                                        <p className="text-sm text-slate-500 mb-6 max-w-sm mx-auto">
+                                            Bắt đầu lưu các điểm mô phỏng Monte Carlo để xem lại chiến lược đầu tư.
+                                        </p>
+                                    </GlassCard>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {analyses.map((analysis) => {
+                                            const result = analysis.result_data;
+                                            const isProfit = (result?.percentageReturn ?? 0) >= 0;
+
+                                            return (
+                                                <GlassCard
+                                                    key={analysis.id}
+                                                    className="p-5 hover:border-indigo-500/30 transition-colors bg-slate-900/40"
+                                                >
+                                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 flex items-center justify-center">
+                                                                <span className="text-lg font-bold text-indigo-400">
+                                                                    {analysis.symbol}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <h3 className="font-semibold text-white">{analysis.symbol}</h3>
+                                                                <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                                                                    <Calendar className="w-3 h-3" />
+                                                                    <span>
+                                                                        {format(new Date(analysis.start_date), 'dd/MM/yyyy')}
+                                                                        <span className="mx-2 text-slate-600">→</span>
+                                                                        {format(new Date(analysis.end_date), 'dd/MM/yyyy')}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex flex-wrap items-center gap-6 bg-black/20 p-3 rounded-lg border border-white/5">
+                                                            <div>
+                                                                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Vốn Ban Đầu</p>
+                                                                <p className="font-mono text-sm text-slate-200">
+                                                                    {formatCurrency(analysis.initial_investment)}
+                                                                </p>
+                                                            </div>
+                                                            {result && (
+                                                                <>
+                                                                    <div className="w-px h-8 bg-slate-800"></div>
+                                                                    <div>
+                                                                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Kết Quả Cuối</p>
+                                                                        <p className="font-mono text-sm text-white font-medium">
+                                                                            {formatCurrency(result.currentValue ?? 0)}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Tỷ Suất</p>
+                                                                        <p
+                                                                            className={`font-mono text-sm font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}
+                                                                        >
+                                                                            {isProfit ? '+' : ''}
+                                                                            {result.percentageReturn?.toFixed(2)}%
+                                                                        </p>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                            <div className="flex items-center gap-1 ml-2">
+                                                                <a
+                                                                    href={`/wealth-journey?symbol=${analysis.symbol}&start=${analysis.start_date}&end=${analysis.end_date}&amount=${analysis.initial_investment}`}
+                                                                    className="p-2 rounded-lg hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 transition-colors"
+                                                                    title="Xem lại biểu đồ Monte Carlo"
+                                                                >
+                                                                    <Eye className="w-4 h-4" />
+                                                                </a>
+                                                                <button
+                                                                    onClick={() => deleteAnalysis(analysis.id)}
+                                                                    className="p-2 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                                                                    title="Xóa phân tích"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-3 pt-3 border-t border-slate-800/50 text-[10px] text-slate-600 flex justify-end">
+                                                        Đã lưu lúc: {format(new Date(analysis.created_at), "HH:mm, dd/MM/yyyy", { locale: vi })}
+                                                    </div>
+                                                </GlassCard>
+                                            );
+                                        })}
+                                    </div>
+                                )
+                            ) : (
+                                <div className="text-center py-12">
+                                    <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                                        <Lock className="w-8 h-8 text-slate-500" />
+                                    </div>
+                                    <p className="text-slate-400">Đang đồng bộ dữ liệu Supabase...</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                </div>
             </div>
         </div>
     );

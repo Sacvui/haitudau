@@ -111,6 +111,46 @@ export function simplifiedDCF(
     return totalPV;
 }
 
+/**
+ * Reverse DCF
+ * Numerically solves for the implied growth rate `g` that makes the DCF Intrinsic Value equal to the Current Price.
+ * Uses the Bisection Method.
+ */
+export function calculateReverseDCF(
+    currentPrice: number,
+    eps: number,
+    discountRate: number,
+    projectionYears: number = 10,
+    terminalGrowthRate: number = 0.03
+): number | null {
+    if (eps <= 0 || currentPrice <= 0 || discountRate <= terminalGrowthRate) return null;
+
+    let g_low = -0.99; // -99% growth (almost bankruptcy)
+    let g_high = 2.0;  // 200% growth (hyper growth)
+    let g_mid = 0;
+    const tolerance = 0.0001; // 0.01% precision
+    const maxIterations = 100;
+
+    for (let i = 0; i < maxIterations; i++) {
+        g_mid = (g_low + g_high) / 2;
+        const pv = simplifiedDCF(eps, g_mid, discountRate, projectionYears, terminalGrowthRate);
+
+        if (Math.abs(pv - currentPrice) < tolerance * currentPrice) {
+            return g_mid; // Found it within tolerance
+        }
+
+        if (pv < currentPrice) {
+            // PV is too low, we need a higher growth rate
+            g_low = g_mid;
+        } else {
+            // PV is too high, we need a lower growth rate
+            g_high = g_mid;
+        }
+    }
+
+    return g_mid; // Return best approximation after max iterations
+}
+
 // ===================== MARGIN OF SAFETY =====================
 
 export function calculateMarginOfSafety(
