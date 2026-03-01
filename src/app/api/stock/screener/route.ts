@@ -68,34 +68,64 @@ export async function GET(request: NextRequest) {
 
         const realtimeData = response.data?.data || [];
 
+        // Check if all prices are 0 (weekend/off-hours)
+        const allZero = realtimeData.every((q: any) => !q.matchedPrice && !q.refPrice);
+
+        // Fallback: fetch last trading day prices from DNSE (VNDirect) when real-time is empty
+        // DNSE works 24/7 including weekends, unlike SSI which blocks on Sat/Sun
+        let fallbackPrices: Record<string, { close: number; prevClose: number; volume: number }> = {};
+        if (allZero || realtimeData.length === 0) {
+            console.log('[Screener] Real-time prices are all 0 (off-hours). Fetching DNSE fallback...');
+            const endTs = Math.floor(Date.now() / 1000);
+            const startTs = endTs - 10 * 24 * 60 * 60; // 10 days back
+
+            const histResults = await Promise.allSettled(
+                VN30_SYMBOLS.map(async (sym) => {
+                    const hRes = await axios.get('https://dchart-api.vndirect.com.vn/dchart/history', {
+                        params: { resolution: 'D', symbol: sym, from: startTs, to: endTs },
+                        timeout: 4000
+                    });
+                    const hd = hRes.data;
+                    if (hd.s === 'ok' && hd.c && hd.c.length >= 2) {
+                        const lastIdx = hd.c.length - 1;
+                        return {
+                            symbol: sym,
+                            close: hd.c[lastIdx] * 1000, // DNSE returns in 1000 VND
+                            prevClose: hd.c[lastIdx - 1] * 1000,
+                            volume: hd.v[lastIdx]
+                        };
+                    }
+                    return null;
+                })
+            );
+            for (const r of histResults) {
+                if (r.status === 'fulfilled' && r.value) {
+                    fallbackPrices[r.value.symbol] = r.value;
+                }
+            }
+            console.log(`[Screener] DNSE fallback: ${Object.keys(fallbackPrices).length}/${VN30_SYMBOLS.length} stocks`);
+        }
+
         // 2. Process and Enrich Data
         const enrichedStocks: EnrichedStockData[] = VN30_SYMBOLS.map(symbol => {
             const quote = realtimeData.find((q: any) => q.stockSymbol === symbol) || {};
+            const fb = fallbackPrices[symbol];
 
-            // SSI provides price in 1000 VND unit for some fields, check format
-            // usually matchedPrice is the current price
-            // Default 0 if not found
-
-            // Fields from SSI response typically:
-            // matchedPrice: current price
-            // priceChange: change value
-            // priceChangePercent: change %
-            // totalVolume: volume
-
-            const currentPrice = (quote.matchedPrice || quote.refPrice || 0) * 1000;
+            // Use real-time if available, otherwise fallback to history
+            const currentPrice = (quote.matchedPrice || quote.refPrice || 0) * 1000 || (fb?.close || 0);
+            const change = (quote.priceChange || 0) || (fb ? fb.close - fb.prevClose : 0);
+            const changePercent = (quote.priceChangePercent || 0) || (fb && fb.prevClose > 0 ? parseFloat(((fb.close - fb.prevClose) / fb.prevClose * 100).toFixed(2)) : 0);
+            const volume = (quote.totalVolume || 0) || (fb?.volume || 0);
 
             // Get Dividend Info
             const divInfo = (dividendsData as any)[symbol] || [];
 
             // Calculate Dividend Metrics
-            // Get latest cash dividend year
             const currentYear = new Date().getFullYear();
             const lastYearCash = divInfo
                 .filter((d: any) => d.type === 'cash' && new Date(d.exDate).getFullYear() >= currentYear - 1)
                 .reduce((sum: number, d: any) => sum + d.value, 0);
 
-            // Estimate forward yield based on last year history or generic
-            // For simplicity, use sum of dividends in last 12 months
             const dividendPerShare = lastYearCash;
             const dividendYield = currentPrice > 0 ? (dividendPerShare / currentPrice) * 100 : 0;
 
@@ -105,18 +135,18 @@ export async function GET(request: NextRequest) {
 
             return {
                 symbol,
-                name: symbol, // Could add full name map if needed
-                price: currentPrice, // Fix: Map to price
+                name: symbol,
+                price: currentPrice,
                 currentPrice,
-                change: quote.priceChange || 0,
-                changePercent: quote.priceChangePercent || 0,
-                volume: quote.totalVolume || 0,
+                change,
+                changePercent,
+                volume,
                 dividendYield: parseFloat(dividendYield.toFixed(2)),
                 dividendPerShare,
-                dividendHistory: [], // Keeping simple for table
-                payoutFrequency: 'Annually', // Approximation
+                dividendHistory: [],
+                payoutFrequency: 'Annually',
                 sector: getSector(symbol),
-                marketCap: (quote.matchedPrice || 0) * 1000 * 1000000, // Very rough estimate placeholder, real mcap needs shares
+                marketCap: currentPrice * 1000000,
                 consistencyScore: calculateConsistency(divInfo),
                 stockDividendRatio
             };
