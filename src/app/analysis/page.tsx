@@ -1,376 +1,284 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { GlassCard } from '@/components/ui/glass';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceDot } from 'recharts';
-import { format } from 'date-fns';
-import { TrendingUp, Plus, X, Search, Coins } from 'lucide-react';
-import { toast } from 'sonner';
+import { Sidebar } from '@/components/Sidebar';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    TrendingUp, TrendingDown, Calendar, Shield, AlertTriangle,
+    CheckCircle, Loader2, Menu, Newspaper, BarChart3, RefreshCw,
+    ArrowUp, ArrowDown, Minus, Clock, Sparkles
+} from 'lucide-react';
 
-// Define VN30 list if not available
-const STOCK_LIST = [
-    "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
-    "MBB", "MSN", "MWG", "PLX", "POW", "SAB", "SHB", "SSB", "SSI", "STB",
-    "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE"
-];
-
-interface StockHistory {
-    symbol: string;
-    data: { date: string; close: number; dividends?: any[] }[];
-    color: string;
+interface DailyReport {
+    report_date: string;
+    symbol_1: string;
+    symbol_2: string;
+    market_summary: string;
+    analysis_1: string;
+    analysis_2: string;
+    signal_1: string;
+    signal_2: string;
+    raw_data: any;
+    created_at: string;
 }
 
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
+const SIGNAL_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+    BUY: { label: 'MUA', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: ArrowUp },
+    SELL: { label: 'BÁN', color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/30', icon: ArrowDown },
+    HOLD: { label: 'GIỮ', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30', icon: Minus },
+    NEUTRAL: { label: 'TRUNG TÍNH', color: 'text-slate-400', bg: 'bg-slate-500/10 border-slate-500/30', icon: Minus },
+};
 
 export default function AnalysisPage() {
-    const [selectedSymbols, setSelectedSymbols] = useState<string[]>(['VNM', 'VIB']);
-    const [chartData, setChartData] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [report, setReport] = useState<DailyReport | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [generating, setGenerating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // Default: Last 12 months
-    const [fromDate, setFromDate] = useState(() => {
-        const d = new Date();
-        d.setFullYear(d.getFullYear() - 1);
-        return d.toISOString().split('T')[0];
-    });
-    const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-
-    // Add Symbol
-    const addSymbol = (symbol: string) => {
-        if (selectedSymbols.includes(symbol)) return;
-        if (selectedSymbols.length >= 5) {
-            toast.error("Chỉ so sánh tối đa 5 mã thôi sếp ơi!");
-            return;
-        }
-        setSelectedSymbols([...selectedSymbols, symbol]);
-    };
-
-    // Remove Symbol
-    const removeSymbol = (symbol: string) => {
-        setSelectedSymbols(selectedSymbols.filter(s => s !== symbol));
-    };
-
-    // Fetch & Normalize Data
+    // Fetch latest report from Supabase
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                // Fetch all concurrently using fromDate & toDate
-                const promises = selectedSymbols.map(async (sym) => {
-                    const res = await fetch(`/api/stock/history?symbol=${sym}&startDate=${fromDate}&endDate=${toDate}`);
-                    const json = await res.json();
+        fetchReport();
+    }, []);
 
-                    // Fetch dividends too
-                    const divRes = await fetch(`/api/stock/dividends?symbol=${sym}`);
-                    const divJson = await divRes.json();
-                    const dividends = divJson.success ? divJson.data : [];
+    const fetchReport = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            // Try to fetch from Supabase
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+            const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-                    return {
-                        symbol: sym,
-                        history: json.success ? json.data : [],
-                        dividends: dividends || []
-                    };
-                });
-
-                const results = await Promise.all(promises);
-
-                // Process Data: Merge by Date & Normalize
-                // 1. Collect all unique dates
-                const allDates = new Set<string>();
-                results.forEach(r => r.history.forEach((h: any) => allDates.add(h.date)));
-                const sortedDates = Array.from(allDates).sort();
-
-                // 2. Build Chart Data Points
-                const processedData = sortedDates.map(date => {
-                    const point: any = { date };
-
-                    results.forEach((stock, idx) => {
-                        // Find price at this date
-                        const pricePoint = stock.history.find((h: any) => h.date === date);
-
-                        if (pricePoint) {
-                            // Normalized Logic: (Current / Start) * 100 ? 
-                            // Or just Raw Price? User requested "Normalized to see trends together"
-                            // Let's implement Normalized Percentage (Starting at 0% or 100)
-
-                            // Find Start Price (First valid price in range)
-                            const startPrice = stock.history[0]?.close || 1;
-                            const normalized = ((pricePoint.close - startPrice) / startPrice) * 100;
-
-                            point[stock.symbol] = normalized;
-                            point[`${stock.symbol}_price`] = pricePoint.close;
+            if (supabaseUrl && supabaseKey) {
+                const res = await fetch(
+                    `${supabaseUrl}/rest/v1/daily_reports?order=report_date.desc&limit=1`,
+                    {
+                        headers: {
+                            'apikey': supabaseKey,
+                            'Authorization': `Bearer ${supabaseKey}`,
                         }
-                    });
-
-                    return point;
-                });
-
-                // Smart Map Dividends (Fuzzy Match: Attach to next available trading date)
-                results.forEach(stock => {
-                    stock.dividends.forEach((div: any) => {
-                        const divDate = div.exDate || div.date;
-                        if (divDate < fromDate || divDate > toDate) return;
-
-                        // Find closest chart point (Greater or Equal)
-                        const matchPoint = processedData.find((p: any) => p.date >= divDate);
-
-                        if (matchPoint) {
-                            matchPoint[`${stock.symbol}_div`] = div;
-                        }
-                    });
-                });
-
-                setChartData(processedData);
-
-            } catch (err) {
-                console.error(err);
-                toast.error("Lỗi lấy dữ liệu");
-            } finally {
-                setLoading(false);
+                    }
+                );
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        setReport(data[0]);
+                        setLoading(false);
+                        return;
+                    }
+                }
             }
-        };
-
-        fetchData();
-    }, [selectedSymbols, fromDate, toDate]);
-
-    // Custom Tooltip
-    // Show Dividend info if hovered
-    const CustomTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl text-xs">
-                    <p className="font-bold text-slate-300 mb-2">{format(new Date(label), 'dd/MM/yyyy')}</p>
-                    {payload.map((p: any, idx: number) => {
-                        const symbol = p.dataKey;
-                        const price = p.payload[`${symbol}_price`];
-                        const div = p.payload[`${symbol}_div`];
-
-                        return (
-                            <div key={symbol} className="flex flex-col mb-1.5 last:mb-0">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-                                    <span className="font-bold text-slate-100">{symbol}</span>:
-                                    <span className={Number(p.value) >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                                        {Number(p.value) > 0 ? '+' : ''}{Number(p.value).toFixed(2)}%
-                                    </span>
-                                    <span className="text-slate-500">({(price / 1000).toFixed(1)}k)</span>
-                                </div>
-                                {div && (
-                                    <div className="pl-4 mt-0.5 text-[10px] text-amber-400 flex items-center gap-1">
-                                        <Coins className="w-3 h-3" />
-                                        {div.type === 'stock' ? `Thưởng CP: ${(div.value * 100).toFixed(0)}%` : `Tiền: ${div.value}đ`}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            );
+            setError('Chưa có báo cáo nào. Bấm "Tạo Báo Cáo" để khởi chạy phân tích AI.');
+        } catch (err) {
+            setError('Không thể tải báo cáo. Kiểm tra kết nối.');
+        } finally {
+            setLoading(false);
         }
-        return null;
     };
 
-    // Custom Dot for Dividends
-    const CustomizedDot = (props: any) => {
-        const { cx, cy, payload, dataKey } = props;
-        const symbol = dataKey;
-        const div = payload[`${symbol}_div`];
-
-        if (div && cx && cy) {
-            const isStock = div.type === 'stock';
-            return (
-                <g transform={`translate(${cx},${cy})`} style={{ pointerEvents: 'none' }}>
-                    {/* Outer glow */}
-                    <circle r="12" fill={isStock ? "#3b82f6" : "#fbbf24"} fillOpacity="0.3" />
-                    {/* Main circle */}
-                    <circle r="7" fill={isStock ? "#3b82f6" : "#fbbf24"} stroke="#fff" strokeWidth="2" />
-                    {/* Icon/Text */}
-                    <text x="0" y="3" textAnchor="middle" fontSize="9" fill="#000" fontWeight="900" style={{ pointerEvents: 'none' }}>
-                        {isStock ? 'P' : '$'}
-                    </text>
-                    {/* Label floating above (Optional) */}
-                    <text x="0" y="-12" textAnchor="middle" fontSize="10" fill="white" fontWeight="bold" stroke="black" strokeWidth="2" paintOrder="stroke">
-                        {isStock ? 'CP' : 'Tiền'}
-                    </text>
-                </g>
-            );
+    // Manually trigger report generation
+    const generateReport = async () => {
+        setGenerating(true);
+        setError(null);
+        try {
+            const res = await fetch('/api/daily-report?key=' + (process.env.NEXT_PUBLIC_GEMINI_KEY_PREFIX || ''));
+            const data = await res.json();
+            if (data.success) {
+                // Convert API response to DailyReport format
+                setReport({
+                    report_date: data.date,
+                    symbol_1: data.picks.symbol_1,
+                    symbol_2: data.picks.symbol_2,
+                    market_summary: data.market_summary,
+                    analysis_1: data.analysis_1,
+                    analysis_2: data.analysis_2,
+                    signal_1: data.picks.signal_1,
+                    signal_2: data.picks.signal_2,
+                    raw_data: data.raw,
+                    created_at: new Date().toISOString(),
+                });
+            } else {
+                setError(data.error || 'Không thể tạo báo cáo');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Lỗi khi tạo báo cáo');
+        } finally {
+            setGenerating(false);
         }
-        return null;
+    };
+
+    const formatDate = (dateStr: string) => {
+        return new Date(dateStr).toLocaleDateString('vi-VN', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
     };
 
     return (
-        <div className="min-h-screen bg-[#0b1121] p-6 pb-20">
-            <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header & Controls */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-white flex items-center gap-2">
-                            <TrendingUp className="w-8 h-8 text-indigo-500" />
-                            Phân Tích Tương Quan
-                        </h1>
-                        <p className="text-slate-400 text-sm mt-1">So sánh hiệu suất & cổ tức (Quy về % tăng trưởng)</p>
-                    </div>
+        <div className="flex h-screen w-full bg-[#030712] overflow-hidden font-sans text-slate-100">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden fixed top-16 left-4 z-50 p-2 bg-slate-800 rounded-lg">
+                <Menu className="w-5 h-5" />
+            </button>
+            <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:relative z-40 h-full w-64 transition-transform duration-300`}>
+                <Sidebar />
+            </div>
 
-                    {/* Time Range */}
-                    <div className="flex bg-slate-800/50 p-1.5 rounded-lg border border-slate-700 items-center gap-2">
-                        <input
-                            type="date"
-                            value={fromDate}
-                            onChange={e => setFromDate(e.target.value)}
-                            className="bg-transparent text-white text-xs outline-none font-medium h-full [color-scheme:dark]"
-                        />
-                        <span className="text-slate-500 font-light">-</span>
-                        <input
-                            type="date"
-                            value={toDate}
-                            onChange={e => setToDate(e.target.value)}
-                            className="bg-transparent text-white text-xs outline-none font-medium h-full [color-scheme:dark]"
-                        />
-                    </div>
-                </div>
+            <div className="flex-1 overflow-y-auto">
+                <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
 
-                {/* Stock Selector */}
-                <GlassCard className="p-4 flex flex-wrap gap-2 items-center min-h-[80px]">
-                    {selectedSymbols.map((sym, idx) => (
-                        <div key={sym} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 shadow-sm animate-in zoom-in duration-200">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                            <span className="font-bold text-white uppercase">{sym}</span>
-                            <button onClick={() => removeSymbol(sym)} className="text-slate-500 hover:text-rose-400">
-                                <X className="w-3.5 h-3.5" />
-                            </button>
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
+                                <Newspaper className="w-7 h-7 text-purple-400" />
+                                KHUYẾN NGHỊ SÁNG
+                            </h1>
+                            <p className="text-sm text-slate-500 mt-1">
+                                Phân tích AI chuyên sâu • 2 cổ phiếu VN30 nổi bật mỗi sáng 7:00 AM
+                            </p>
                         </div>
-                    ))}
-
-                    {/* Add Button Dropdown (Clickable) */}
-                    <div className="relative">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                            className="rounded-full border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-white/20"
+                        <button
+                            onClick={generateReport}
+                            disabled={generating}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all text-sm disabled:opacity-50"
                         >
-                            <Plus className="w-4 h-4 mr-1" /> Thêm Mã
-                        </Button>
-
-                        {isDropdownOpen && (
-                            <>
-                                {/* Overlay to close */}
-                                <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
-
-                                {/* Dropdown Content */}
-                                <div className="absolute top-full left-0 mt-2 w-64 bg-[#111827] border border-slate-700 rounded-xl shadow-2xl p-2 z-50 animate-in zoom-in-95 duration-100">
-                                    <div className="mb-2 px-1">
-                                        <div className="flex items-center bg-slate-800 rounded px-2 py-1">
-                                            <Search className="w-3 h-3 text-slate-500 mr-2" />
-                                            <input
-                                                className="bg-transparent border-none text-xs text-white w-full outline-none placeholder-slate-600"
-                                                placeholder="Tìm kiếm..."
-                                                autoFocus
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        const filtered = STOCK_LIST
-                                                            .filter(s => !selectedSymbols.includes(s))
-                                                            .filter(s => s.includes(searchTerm));
-
-                                                        if (filtered.length > 0) {
-                                                            const firstMatch = filtered[0];
-                                                            addSymbol(firstMatch);
-                                                            setIsDropdownOpen(false);
-                                                            setSearchTerm('');
-                                                            toast.success(`Đang tải dữ liệu ${firstMatch}...`);
-                                                        }
-                                                    }
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-4 gap-1 max-h-60 overflow-y-auto custom-scrollbar">
-                                        {STOCK_LIST
-                                            .filter(s => !selectedSymbols.includes(s))
-                                            .filter(s => s.includes(searchTerm))
-                                            .map(s => (
-                                                <button
-                                                    key={s}
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        addSymbol(s);
-                                                        setIsDropdownOpen(false);
-                                                        setSearchTerm('');
-                                                        toast.success(`Đang tải dữ liệu ${s}...`);
-                                                    }}
-                                                    className="text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 p-2 rounded text-center transition-colors cursor-pointer active:scale-95 bg-slate-800/50"
-                                                >
-                                                    {s}
-                                                </button>
-                                            ))}
-                                    </div>
-                                </div>
-                            </>
-                        )}
+                            {generating ? (
+                                <><Loader2 className="w-4 h-4 animate-spin" /> Đang phân tích...</>
+                            ) : (
+                                <><Sparkles className="w-4 h-4" /> Tạo Báo Cáo Ngay</>
+                            )}
+                        </button>
                     </div>
-                </GlassCard>
 
-                {/* Main Chart */}
-                <GlassCard className="p-2 md:p-6 h-[500px] relative">
+                    {/* Loading */}
                     {loading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-10 rounded-xl">
-                            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="flex items-center justify-center py-20">
+                            <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
                         </div>
                     )}
 
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                            <XAxis
-                                dataKey="date"
-                                tick={{ fontSize: 10, fill: '#64748b' }}
-                                tickFormatter={(d) => format(new Date(d), 'dd/MM/yy')}
-                                minTickGap={30}
-                                axisLine={false}
-                                tickLine={false}
-                            />
-                            <YAxis
-                                tick={{ fontSize: 10, fill: '#64748b' }}
-                                tickFormatter={(v) => `${v > 0 ? '+' : ''}${v}%`}
-                                axisLine={false}
-                                tickLine={false}
-                            />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                    {/* Error / Empty */}
+                    {error && !loading && (
+                        <Card className="bg-slate-900/50 border-slate-800">
+                            <CardContent className="p-8 text-center">
+                                <Newspaper className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                                <p className="text-slate-400 mb-4">{error}</p>
+                                <button
+                                    onClick={generateReport}
+                                    disabled={generating}
+                                    className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all inline-flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {generating ? (
+                                        <><Loader2 className="w-4 h-4 animate-spin" /> Đang xử lý...</>
+                                    ) : (
+                                        <><Sparkles className="w-4 h-4" /> Tạo Báo Cáo Đầu Tiên</>
+                                    )}
+                                </button>
+                            </CardContent>
+                        </Card>
+                    )}
 
-                            {selectedSymbols.map((sym, idx) => (
-                                <Line
-                                    key={sym}
-                                    type="monotone"
-                                    dataKey={sym}
-                                    name={sym}
-                                    stroke={COLORS[idx % COLORS.length]}
-                                    strokeWidth={3}
-                                    dot={<CustomizedDot />} // Use custom dot for dividends
-                                    activeDot={{ r: 6, strokeWidth: 0 }}
-                                />
-                            ))}
-                        </LineChart>
-                    </ResponsiveContainer>
-                </GlassCard>
+                    {/* Report Content */}
+                    {report && !loading && (
+                        <>
+                            {/* Date Banner */}
+                            <div className="flex items-center gap-3 text-sm text-slate-400">
+                                <Calendar className="w-4 h-4" />
+                                <span>{formatDate(report.report_date)}</span>
+                                <span className="text-slate-600">•</span>
+                                <Clock className="w-3 h-3" />
+                                <span>Cập nhật lúc {new Date(report.created_at).toLocaleTimeString('vi-VN')}</span>
+                            </div>
 
-                {/* Guide */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-500">
-                    <div className="flex gap-2">
-                        <span className="text-yellow-400 font-bold text-lg leading-none">●</span>
-                        <p>Các điểm icon màu vàng ($) trên đường biểu đồ đánh dấu thời điểm trả cổ tức (tiền mặt hoặc cổ phiếu).</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <span className="text-indigo-400 font-bold text-lg leading-none">📈</span>
-                        <p>Biểu đồ hiển thị % Tăng/Giảm so với điểm bắt đầu của chu kỳ, giúp so sánh hiệu suất thực tế giữa các mã có thị giá khác nhau.</p>
-                    </div>
+                            {/* Market Summary */}
+                            <Card className="bg-gradient-to-br from-slate-900 to-indigo-950/30 border-slate-800 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 blur-3xl rounded-full pointer-events-none"></div>
+                                <CardContent className="p-6 relative z-10">
+                                    <h2 className="text-sm font-bold text-indigo-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <BarChart3 className="w-4 h-4" /> Tổng Quan Thị Trường
+                                    </h2>
+                                    <p className="text-slate-300 leading-relaxed text-sm whitespace-pre-line">
+                                        {report.market_summary}
+                                    </p>
+                                </CardContent>
+                            </Card>
+
+                            {/* 2 Stock Analysis Cards */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {[
+                                    { symbol: report.symbol_1, signal: report.signal_1, analysis: report.analysis_1, raw: report.raw_data?.stock1 },
+                                    { symbol: report.symbol_2, signal: report.signal_2, analysis: report.analysis_2, raw: report.raw_data?.stock2 },
+                                ].map((item, idx) => {
+                                    const signalCfg = SIGNAL_CONFIG[item.signal] || SIGNAL_CONFIG.NEUTRAL;
+                                    const SignalIcon = signalCfg.icon;
+                                    return (
+                                        <Card key={idx} className={`border ${signalCfg.bg} relative overflow-hidden`}>
+                                            <div className="absolute top-0 right-0 w-32 h-32 opacity-10 blur-2xl rounded-full pointer-events-none"
+                                                style={{ background: item.signal === 'BUY' ? '#10b981' : item.signal === 'SELL' ? '#ef4444' : '#f59e0b' }}></div>
+                                            <CardContent className="p-6 relative z-10">
+                                                {/* Header */}
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center">
+                                                            <span className="text-lg font-black text-white">{item.symbol?.slice(0, 2)}</span>
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="text-xl font-black text-white">{item.symbol}</h3>
+                                                            {item.raw && (
+                                                                <p className="text-xs text-slate-400">
+                                                                    {item.raw.price?.toLocaleString()}đ
+                                                                    <span className={item.raw.changePct >= 0 ? 'text-emerald-400 ml-2' : 'text-rose-400 ml-2'}>
+                                                                        {item.raw.changePct >= 0 ? '+' : ''}{item.raw.changePct}%
+                                                                    </span>
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-bold text-xs ${signalCfg.bg} ${signalCfg.color}`}>
+                                                        <SignalIcon className="w-3.5 h-3.5" />
+                                                        {signalCfg.label}
+                                                    </div>
+                                                </div>
+
+                                                {/* Metrics Row */}
+                                                {item.raw && (
+                                                    <div className="grid grid-cols-3 gap-2 mb-4">
+                                                        <div className="bg-slate-800/50 rounded-lg p-2 text-center">
+                                                            <p className="text-[10px] text-slate-500 font-bold">RSI-14</p>
+                                                            <p className={`text-sm font-bold ${item.raw.rsi14 < 30 ? 'text-emerald-400' : item.raw.rsi14 > 70 ? 'text-rose-400' : 'text-slate-200'}`}>
+                                                                {item.raw.rsi14}
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-slate-800/50 rounded-lg p-2 text-center">
+                                                            <p className="text-[10px] text-slate-500 font-bold">MA-20</p>
+                                                            <p className="text-sm font-bold text-slate-200">{(item.raw.ma20 / 1000).toFixed(1)}k</p>
+                                                        </div>
+                                                        <div className="bg-slate-800/50 rounded-lg p-2 text-center">
+                                                            <p className="text-[10px] text-slate-500 font-bold">Volume</p>
+                                                            <p className="text-sm font-bold text-slate-200">{(item.raw.volume / 1000000).toFixed(1)}M</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Analysis Text */}
+                                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+                                                    {item.analysis}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Disclaimer */}
+                            <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-4 text-center">
+                                <p className="text-[10px] text-slate-600 leading-relaxed max-w-2xl mx-auto">
+                                    ⚠️ Bài phân tích được tạo bởi AI (Google Gemini) kết hợp dữ liệu kỹ thuật thực tế.
+                                    Đây KHÔNG phải lời khuyến nghị đầu tư chính thức. Mọi quyết định đầu tư là trách nhiệm cá nhân của bạn.
+                                    Luôn tham khảo thêm nhiều nguồn trước khi ra quyết định.
+                                </p>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
