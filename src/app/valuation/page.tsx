@@ -484,18 +484,32 @@ export default function ValuationPage() {
                                         const fairPB = Math.max(1.5, roe / 10);
                                         const targetPB = bvps * fairPB;
 
-                                        // Method 2: P/E × EPS — target P/E = max(10, growth rate, industry avg)
-                                        const targetPE_ratio = Math.max(10, Math.min(growth > 0 ? growth : 12, fundamentals.industryPE || 15));
+                                        // Method 2: P/E × EPS — Blend industry average and projected growth
+                                        const basePE = fundamentals.industryPE || 15;
+                                        const targetPE_ratio = growth > 0 ? Math.max(10, Math.min(basePE * 1.5, (basePE + growth) / 2)) : basePE;
                                         const targetPE = eps * targetPE_ratio;
 
-                                        // Method 3: PEG-adjusted — use earnings growth
+                                        // Method 3: PEG-adjusted — Premium expansion for tech/growth sectors
                                         const peg = growth > 0 ? pe / growth : 2;
-                                        const fairPEG = 1.0; // PEG = 1 is fair
+                                        const fairPEG = basePE >= 20 ? 1.2 : 1.0; // Premium sectors command > 1.0 PEG
                                         const targetPEG = growth > 0 ? eps * growth * fairPEG : targetPE;
 
-                                        // Average target
+                                        // Smart Sector Weighting for final target
+                                        let weightPB = 1 / 3, weightPE = 1 / 3, weightPEG = 1 / 3;
+                                        if (basePE >= 20 || roe >= 20 || pb >= 4) {
+                                            // Asset-light / Tech / High Growth: Downweight P/B heavily
+                                            weightPB = 0.10;
+                                            weightPE = 0.45;
+                                            weightPEG = 0.45;
+                                        } else if (basePE <= 12 && pb <= 2) {
+                                            // Banks / Heavy Industry / Deep Value: P/B is highly relevant
+                                            weightPB = 0.50;
+                                            weightPE = 0.30;
+                                            weightPEG = 0.20;
+                                        }
+
                                         const targets = [targetPB, targetPE, targetPEG].filter(t => t > 0 && isFinite(t));
-                                        const avgTarget = targets.length > 0 ? targets.reduce((a, b) => a + b, 0) / targets.length : 0;
+                                        const avgTarget = (targetPB * weightPB) + (targetPE * weightPE) + (targetPEG * weightPEG);
                                         const lowTarget = Math.min(...targets);
                                         const highTarget = Math.max(...targets);
                                         const upside = avgTarget > 0 ? ((avgTarget - price) / price * 100) : 0;

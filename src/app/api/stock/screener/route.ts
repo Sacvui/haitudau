@@ -120,17 +120,25 @@ export async function GET(request: NextRequest) {
             // Get Dividend Info
             const divInfo = (dividendsData as any)[symbol] || [];
 
-            // Calculate Dividend Metrics
-            const currentYear = new Date().getFullYear();
-            const lastYearCash = divInfo
-                .filter((d: any) => d.type === 'cash' && new Date(d.exDate).getFullYear() >= currentYear - 1)
-                .reduce((sum: number, d: any) => sum + d.value, 0);
+            // Calculate Dividend Metrics: find the most recent year with cash dividends
+            const lastYearCash = (() => {
+                const cashDivs = divInfo.filter((d: any) => d.type === 'cash');
+                if (cashDivs.length === 0) return 0;
+
+                // Find the latest year in the data
+                const latestYear = Math.max(...cashDivs.map((d: any) => new Date(d.exDate).getFullYear()));
+
+                // Sum all cash dividends for that latest year
+                return cashDivs
+                    .filter((d: any) => new Date(d.exDate).getFullYear() === latestYear)
+                    .reduce((sum: number, d: any) => sum + d.value, 0);
+            })();
 
             const dividendPerShare = lastYearCash;
             const dividendYield = currentPrice > 0 ? (dividendPerShare / currentPrice) * 100 : 0;
 
             // Stock Dividend Ratio (Bonus)
-            const lastStockDiv = divInfo.find((d: any) => d.type === 'stock' && new Date(d.exDate).getFullYear() >= currentYear - 1);
+            const lastStockDiv = divInfo.find((d: any) => d.type === 'stock');
             const stockDividendRatio = lastStockDiv ? lastStockDiv.value / 100 : 0;
 
             return {
