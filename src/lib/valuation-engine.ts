@@ -71,13 +71,19 @@ export function peRelativeValuation(
 
 /**
  * Graham Number (Benjamin Graham)
- * Intrinsic Value = √(22.5 × EPS × BVPS)
+ * Intrinsic Value = √(Multiplier × EPS × BVPS)
  * The 22.5 comes from Graham's criteria: P/E ≤ 15 and P/B ≤ 1.5 (15 × 1.5 = 22.5)
+ * Adjusted for banks (high BVPS): Multiplier lowered to 15
  * Best for: value investing, conservative valuation
  */
 export function grahamNumber(eps: number, bvps: number): number {
     if (eps <= 0 || bvps <= 0) return 0;
-    return Math.sqrt(22.5 * eps * bvps);
+
+    // Banks/Financials typically have massive Book Value relative to EPS (P/B < 1.5 usually)
+    // The standard 22.5 multiplier over-inflates them.
+    const multiplier = bvps > eps * 4 ? 15.0 : 22.5;
+
+    return Math.sqrt(multiplier * eps * bvps);
 }
 
 /**
@@ -88,7 +94,7 @@ export function grahamNumber(eps: number, bvps: number): number {
  */
 export function simplifiedDCF(
     eps: number,
-    growthRate: number,     // decimal (e.g., 0.15 for 15%)
+    initialGrowthRate: number,     // decimal (e.g., 0.15 for 15%)
     discountRate: number,   // decimal (e.g., 0.12 for 12%)
     projectionYears: number = 10,
     terminalGrowthRate: number = 0.03 // 3% perpetual growth
@@ -98,9 +104,13 @@ export function simplifiedDCF(
     let totalPV = 0;
     let projectedEPS = eps;
 
-    // Phase 1: Project EPS growth for N years
+    // Phase 1: Project EPS growth for N years with linear decay to terminal rate
+    // E.g. yr1 = 15%, yr10 = 3%. Decay per year = (15% - 3%) / 10
+    const annualDecay = (initialGrowthRate - terminalGrowthRate) / projectionYears;
+
     for (let year = 1; year <= projectionYears; year++) {
-        projectedEPS *= (1 + growthRate);
+        const currentYearGrowth = Math.max(terminalGrowthRate, initialGrowthRate - (annualDecay * year));
+        projectedEPS *= (1 + currentYearGrowth);
         totalPV += projectedEPS / Math.pow(1 + discountRate, year);
     }
 
@@ -310,9 +320,23 @@ export function runFullValuation(
 
     // Calculate weighted average intrinsic value (only from valid results)
     const validResults = results.filter(r => r.intrinsicValue > 0 && r.confidence > 20);
-    const totalWeight = validResults.reduce((sum, r) => sum + r.confidence, 0);
+
+    // Apply penalty to extreme outliers (e.g., Graham Number for banks with huge BVPS)
+    const adjustedResults = validResults.map(r => {
+        let adjConfidence = r.confidence;
+        if (r.intrinsicValue > input.currentPrice * 2) {
+            // If valuation is >200% of current price, slash its confidence weight heavily
+            adjConfidence = r.confidence * 0.2;
+        } else if (r.intrinsicValue > input.currentPrice * 1.5) {
+            // If valuation is >150% of current price, reduce confidence moderately
+            adjConfidence = r.confidence * 0.5;
+        }
+        return { ...r, adjConfidence };
+    });
+
+    const totalWeight = adjustedResults.reduce((sum, r) => sum + r.adjConfidence, 0);
     const weightedAvg = totalWeight > 0
-        ? validResults.reduce((sum, r) => sum + r.intrinsicValue * r.confidence, 0) / totalWeight
+        ? adjustedResults.reduce((sum, r) => sum + r.intrinsicValue * r.adjConfidence, 0) / totalWeight
         : 0;
 
     const overallMos = calculateMarginOfSafety(weightedAvg, input.currentPrice);
