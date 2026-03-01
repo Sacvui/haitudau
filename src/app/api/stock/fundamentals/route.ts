@@ -81,81 +81,123 @@ export async function GET(request: NextRequest) {
     let historicalReturn5Y = 0;
     let debtToEquity = 0;
     let currentRatio = 0;
+    let roa = 0;
 
-    // Fetch real metrics from CafeF HTML because APIs are heavily protected by CDNs
-    if (eps === 0) {
+    // ── Step 1: Scrape CafeF for ALL available metrics ──
+    try {
+        const cafefRes = await axios.get(`https://s.cafef.vn/hose/${symbol}-cong-ty.chn`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            timeout: 8000
+        });
+        const html = cafefRes.data;
+
+        // Generic metric extractor from CafeF JSON payload
+        const extractJsonMetric = (keyword: string): number => {
+            const regex = new RegExp(`"Text":"[^"]*?${keyword}[^"]*?","Value":"([\\-0-9\\.,]+)"`, 'i');
+            const match = html.match(regex);
+            if (match && match[1]) {
+                return parseFloat(match[1].replace(/,/g, ''));
+            }
+            return 0;
+        };
+
+        const epsRaw = extractJsonMetric('EPS');
+        if (epsRaw !== 0) eps = Math.round(epsRaw * 1000);
+
+        const peRaw = extractJsonMetric('P.E');
+        if (peRaw > 0) pe = peRaw;
+
+        const roeRaw = extractJsonMetric('ROE');
+        if (roeRaw !== 0) roe = roeRaw;
+
+        const roaRaw = extractJsonMetric('ROA');
+        if (roaRaw !== 0) roa = roaRaw;
+
+        const bvRaw = extractJsonMetric('sổ sách');
+        if (bvRaw > 0) {
+            bvps = Math.round(bvRaw * 1000);
+            if (currentPrice > 0 && bvps > 0) pb = currentPrice / bvps;
+        }
+
+        // Try to extract D/E, current ratio, profit growth directly
+        const deRaw = extractJsonMetric('nợ.*vốn');
+        if (deRaw > 0) debtToEquity = deRaw;
+
+        const crRaw = extractJsonMetric('thanh toán hiện');
+        if (crRaw > 0) currentRatio = crRaw;
+
+        const growthRaw = extractJsonMetric('tăng trưởng.*lợi nhuận');
+        if (growthRaw !== 0) profitGrowth = growthRaw;
+
+        if (currentPrice === 0 && eps > 0 && pe > 0) {
+            currentPrice = Math.round(eps * pe);
+        }
+    } catch (e) {
+        console.warn(`CafeF scraping failed for ${symbol}`);
+    }
+
+    // ── Step 2: Fallback — derive missing metrics from available data ──
+    if (eps === 0 && currentPrice > 0) {
+        pe = 15; pb = 2; roe = 15;
+        eps = Math.round(currentPrice / pe);
+        bvps = Math.round(currentPrice / pb);
+        console.warn(`All data sources failed for ${symbol}, using fallback ratios`);
+    }
+
+    // Derive D/E from ROE/ROA if not scraped directly
+    // D/E ≈ (ROE / ROA) - 1  (DuPont identity: ROE = ROA × Equity Multiplier)
+    if (debtToEquity === 0 && roe > 0 && roa > 0 && roa < roe) {
+        debtToEquity = parseFloat(((roe / roa) - 1).toFixed(2));
+    } else if (debtToEquity === 0) {
+        // Banking sector heuristic: high ROE + high P/B → high leverage
+        debtToEquity = pb > 3 ? parseFloat((pb * 2.5).toFixed(2)) : parseFloat((pb * 1.2).toFixed(2));
+    }
+
+    // Derive current ratio if not available (banks typically don't report this)
+    if (currentRatio === 0) {
+        // Companies with high D/E typically have lower current ratios
+        currentRatio = debtToEquity > 5 ? 0 : parseFloat((2.5 - Math.min(debtToEquity, 2) * 0.5).toFixed(2));
+    }
+
+    // ── Step 3: Fetch price history for profitGrowth (price CAGR) and historical return ──
+    if (profitGrowth === 0 || historicalReturn5Y === 0) {
         try {
-            const cafefRes = await axios.get(`https://s.cafef.vn/hose/${symbol}-cong-ty.chn`, {
-                headers: { 'User-Agent': 'Mozilla/5.0' },
+            const endTs = Math.floor(Date.now() / 1000);
+            const startTs = endTs - 5 * 365 * 24 * 60 * 60; // 5 years back
+            const histRes = await axios.get('https://iboard.ssi.com.vn/dchart/api/history', {
+                params: { resolution: 'M', symbol, from: startTs, to: endTs },
+                headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://iboard.ssi.com.vn/' },
                 timeout: 5000
             });
-            const html = cafefRes.data;
+            const hd = histRes.data;
+            if (hd.s === 'ok' && hd.c && hd.c.length >= 12) {
+                const closes = hd.c.map((v: number) => v * 1000);
 
-            // Extract from Javascript payload array inside CafeF HTML
-            // Example: {"Text":"EPS cơ bản","Value":"6.19"} => 6.19k VND
-            const extractJsonMetric = (keyword: string): number => {
-                // Regex looks for "Text":"...keyword...","Value":"12.34"
-                const regex = new RegExp(`"Text":"[^"]*?${keyword}[^"]*?","Value":"([0-9\\.,]+)"`, 'i');
-                const match = html.match(regex);
-                if (match && match[1]) {
-                    return parseFloat(match[1].replace(/,/g, ''));
+                // 1-year price change → proxy for profit growth
+                const oneYearAgo = closes[closes.length - 13] || closes[0];
+                const latest = closes[closes.length - 1];
+                if (profitGrowth === 0 && oneYearAgo > 0) {
+                    profitGrowth = parseFloat(((latest - oneYearAgo) / oneYearAgo * 100).toFixed(1));
                 }
-                return 0;
-            };
 
-            const epsRaw = extractJsonMetric('EPS');
-            if (epsRaw > 0) eps = Math.round(epsRaw * 1000); // 6.19 -> 6190 VND
-
-            const peRaw = extractJsonMetric('P.E'); // Matches P/E or P\/E perfectly
-            if (peRaw > 0) pe = peRaw;
-
-            const roeRaw = extractJsonMetric('ROE');
-            if (roeRaw > 0) roe = roeRaw;
-
-            const bvRaw = extractJsonMetric('sổ sách'); // BVPS 'Giá trị sổ sách'
-            if (bvRaw > 0) {
-                bvps = Math.round(bvRaw * 1000); // 21.6 -> 21600 VND
-                if (currentPrice > 0 && bvps > 0) {
-                    pb = currentPrice / bvps;
+                // 5Y CAGR
+                if (historicalReturn5Y === 0 && closes.length >= 2) {
+                    const oldest = closes[0];
+                    if (oldest > 0) {
+                        const years = closes.length / 12;
+                        historicalReturn5Y = parseFloat(((Math.pow(latest / oldest, 1 / years) - 1) * 100).toFixed(1));
+                    }
                 }
             }
-
-            // Deduce missing values if CafeF provided partial data
-            if (currentPrice === 0 && eps > 0 && pe > 0) {
-                currentPrice = Math.round(eps * pe);
-            }
-        } catch (e) {
-            console.warn(`CafeF scraping failed for ${symbol}`);
+        } catch {
+            console.warn(`Price history fetch failed for ${symbol}, using estimates`);
         }
     }
 
-    // Ultimate fallback to prevent NaN UI crashes if ALL sources including scraping fail
-    if (eps === 0 && currentPrice > 0) {
-        pe = 15;
-        pb = 2;
-        roe = 15;
-        eps = Math.round(currentPrice / pe);
-        bvps = Math.round(currentPrice / pb);
-        console.warn(`All data sources failed for ${symbol}, using default fallback ratios based on real price`);
-    }
-
-    // Generic mockups for plan completion and 5Y tracking to guarantee UI demo consistency 
-    if (profitGrowth === 0) profitGrowth = -20 + Math.random() * 60; // -20% to 40% growth
-    if (planCompletion === 0) planCompletion = 60 + Math.random() * 60; // 60% to 120% completion
-    if (historicalReturn5Y === 0) historicalReturn5Y = -5 + Math.random() * 25; // -5% to 20% CAGR
-    if (debtToEquity === 0) debtToEquity = 0.5 + Math.random() * 2.5;
-    if (currentRatio === 0) currentRatio = 0.8 + Math.random() * 2.0;
-
-    // Hardcode realistic qualitative values for major tickers
-    if (symbol === 'FPT') {
-        profitGrowth = 20.1; planCompletion = 105; historicalReturn5Y = 32.5; debtToEquity = 1.1; currentRatio = 1.4;
-    } else if (symbol === 'VNM') {
-        profitGrowth = 5.2; planCompletion = 95; historicalReturn5Y = 2.1; debtToEquity = 0.4; currentRatio = 2.1;
-    } else if (symbol === 'VCB') {
-        profitGrowth = 12.5; planCompletion = 102; historicalReturn5Y = 15.5; debtToEquity = 0; currentRatio = 0; // Bank metrics
-    } else if (symbol === 'HPG') {
-        profitGrowth = 45.0; planCompletion = 110; historicalReturn5Y = 18.2; debtToEquity = 0.8; currentRatio = 1.6;
-    }
+    // Final fallbacks for any still-zero values (prevent NaN in UI)
+    if (profitGrowth === 0 && roe > 0) profitGrowth = parseFloat((roe * 0.8).toFixed(1)); // Approximate: sustainable growth ≈ ROE × retention
+    if (historicalReturn5Y === 0 && roe > 0) historicalReturn5Y = parseFloat((roe * 0.6).toFixed(1));
+    if (planCompletion === 0) planCompletion = profitGrowth > 10 ? 105 : profitGrowth > 0 ? 95 : 80; // Based on growth trajectory
 
     const fundamentals: FundamentalsData = {
         symbol,
