@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -120,6 +121,20 @@ export default function ValuationPage() {
         }
     }, [symbol, requiredReturn]);
 
+    // Auto-load from URL params (when navigating from homepage search)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const urlSymbol = params.get('symbol')?.toUpperCase();
+        if (urlSymbol && urlSymbol.length >= 2) {
+            setSymbol(urlSymbol);
+            // Trigger valuation after state update
+            setTimeout(() => {
+                const btn = document.getElementById('btn-valuate');
+                if (btn) btn.click();
+            }, 300);
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     return (
         <div className="flex h-screen w-full bg-[#030712] overflow-hidden font-sans text-slate-100">
             {/* Mobile menu */}
@@ -175,6 +190,7 @@ export default function ValuationPage() {
                                 </button>
 
                                 <Button
+                                    id="btn-valuate"
                                     onClick={handleValuate}
                                     disabled={loading || !symbol.trim()}
                                     className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold px-8 py-3 rounded-xl"
