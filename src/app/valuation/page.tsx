@@ -35,6 +35,11 @@ interface FundamentalsData {
     netIncome: number;
     industry: string;
     companyName: string;
+    debtToEquity: number;
+    currentRatio: number;
+    profitGrowth: number;
+    planCompletion: number;
+    historicalReturn5Y: number;
 }
 
 // Verdict styling
@@ -210,6 +215,11 @@ export default function ValuationPage() {
                         <ErrorBoundary>
                             {/* Summary Card */}
                             <SummaryCard valuation={valuation} fundamentals={fundamentals} />
+
+                            {/* Conviction Dashboard / Health Indicators */}
+                            <div className="mt-6">
+                                <ConvictionDashboard data={fundamentals} />
+                            </div>
 
                             {/* Fundamentals Overview */}
                             <div className="mt-6">
@@ -447,6 +457,138 @@ function SensitivityTable({ data, currentPrice }: { data: ReturnType<typeof gene
                     <span className="text-emerald-400">■</span> Xanh = Giá nội tại {'>'} giá hiện tại ({(currentPrice / 1000).toFixed(1)}k) — CỔ PHIẾU RẺ &nbsp;&nbsp;
                     <span className="text-rose-400">■</span> Đỏ = Giá nội tại {'<'} giá hiện tại — CỔ PHIẾU ĐẮT
                 </p>
+            </CardContent>
+        </Card>
+    );
+}
+
+// ==================== NEW COMPONENT: CONVICTION DASHBOARD ====================
+function ConvictionDashboard({ data }: { data: FundamentalsData }) {
+    // Health logic
+    const isDebtSafe = data.debtToEquity < 1.5;
+    const isLiquiditySafe = data.currentRatio > 1.2;
+    const isGrowing = data.profitGrowth > 0;
+    const isPlanOnTrack = data.planCompletion >= 80;
+
+    return (
+        <Card className="bg-[#111827] border-slate-800 shadow-lg overflow-hidden relative">
+            {/* Background subtle gradient */}
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 z-0" />
+
+            <CardHeader className="pb-3 border-b border-slate-800/50 bg-slate-900/30 relative z-10">
+                <CardTitle className="text-sm font-bold text-slate-200 flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-indigo-400" />
+                        ĐÁNH GIÁ ĐỊNH TÍNH & VĨ MÔ
+                    </span>
+                    <Badge variant="outline" className="text-[10px] bg-indigo-500/10 text-indigo-300 border-indigo-500/20">
+                        Cơ sở ra quyết định đầu tư
+                    </Badge>
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 relative z-10">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                    {/* 1. Sức Khỏe Tài Chính */}
+                    <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                            Mức Độ Rủi Ro (Tài Chính)
+                        </h4>
+
+                        <div>
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-slate-300">Nợ / Vốn chủ sở hữu (D/E)</span>
+                                <span className={`font-mono font-bold ${isDebtSafe ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {data.debtToEquity.toFixed(1)}x
+                                </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full ${isDebtSafe ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                    style={{ width: `${Math.min((data.debtToEquity / 3) * 100, 100)}%` }}
+                                />
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-1">
+                                {isDebtSafe ? 'An toàn / Chuẩn mực (< 1.5x)' : 'Cảnh báo đòn bẩy cao (> 1.5x)'}
+                            </p>
+                        </div>
+
+                        <div>
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-slate-300">Thanh toán hiện hành (CR)</span>
+                                <span className={`font-mono font-bold ${isLiquiditySafe ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                    {data.currentRatio.toFixed(1)}x
+                                </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full ${isLiquiditySafe ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                                    style={{ width: `${Math.min((data.currentRatio / 3) * 100, 100)}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. Động lực tăng trưởng */}
+                    <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                            Kế Hoạch & Tăng Trưởng
+                        </h4>
+
+                        <div>
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-slate-300">Tăng trưởng Lợi nhuận (YoY)</span>
+                                <span className={`font-mono font-bold flex items-center gap-1 ${isGrowing ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {isGrowing ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                    {data.profitGrowth > 0 ? '+' : ''}{data.profitGrowth.toFixed(1)}%
+                                </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-800 rounded-full flex items-center overflow-hidden">
+                                {/* Base middle line at 0% */}
+                                <div className={`h-full ${isGrowing ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                    style={{ width: `${Math.min(Math.abs(data.profitGrowth), 100)}%` }} />
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-slate-300">Hoàn thành KH năm</span>
+                                <span className={`font-mono font-bold ${isPlanOnTrack ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                    {data.planCompletion.toFixed(1)}%
+                                </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full ${isPlanOnTrack ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                                    style={{ width: `${Math.min(data.planCompletion, 100)}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. Tích sản */}
+                    <div className="space-y-4 flex flex-col justify-between h-full border-l-0 md:border-l border-slate-800 md:pl-6">
+                        <div>
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                Hiệu Suất Đầu Tư (5 Năm)
+                            </h4>
+                            <p className="text-[10px] text-slate-500 leading-relaxed mt-1">
+                                Mức sinh lời kép (CAGR) phản ánh chất lượng ban lãnh đạo và giá trị nắm giữ dài hạn.
+                            </p>
+                        </div>
+
+                        <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800 flex items-center justify-between">
+                            <span className="text-sm font-medium text-slate-300">CAGR 5N</span>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-2xl font-black font-mono tracking-tighter ${data.historicalReturn5Y > 10 ? 'text-indigo-400' : data.historicalReturn5Y > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {data.historicalReturn5Y > 0 ? '+' : ''}{data.historicalReturn5Y.toFixed(1)}%
+                                </span>
+                                <span className="text-[10px] text-slate-500 mt-1">/năm</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </CardContent>
         </Card>
     );
