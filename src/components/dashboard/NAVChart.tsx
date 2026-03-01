@@ -25,11 +25,13 @@ interface NAVDataPoint {
 
 interface NAVChartProps {
     data: NAVDataPoint[];
+    compareData?: NAVDataPoint[];
     height?: number;
     symbol: string;
+    compareSymbol?: string;
 }
 
-export function NAVChart({ data, height = 350, symbol }: NAVChartProps) {
+export function NAVChart({ data, compareData, height = 350, symbol, compareSymbol }: NAVChartProps) {
     if (!data || data.length === 0) {
         return (
             <Card className="bg-[#111827] border-slate-800 h-full flex items-center justify-center">
@@ -38,13 +40,25 @@ export function NAVChart({ data, height = 350, symbol }: NAVChartProps) {
         );
     }
 
-    const chartData = data.map((d) => ({
-        ...d,
-        date: format(new Date(d.date), 'dd/MM/yy'),
-        valueM: d.portfolioValue / 1e6,
-        costM: d.totalCost / 1e6,
-        savingsM: d.savingsValue / 1e6,
-    }));
+    // Build a map from compareData by date for efficient lookup
+    const compareMap = new Map<string, number>();
+    if (compareData && compareData.length > 0) {
+        compareData.forEach(d => compareMap.set(d.date, d.portfolioValue));
+    }
+
+    const chartData = data.map((d) => {
+        const compareValue = compareMap.get(d.date);
+        return {
+            ...d,
+            date: format(new Date(d.date), 'dd/MM/yy'),
+            valueM: d.portfolioValue / 1e6,
+            costM: d.totalCost / 1e6,
+            savingsM: d.savingsValue / 1e6,
+            compareM: compareValue ? compareValue / 1e6 : undefined,
+        };
+    });
+
+    const hasCompare = compareData && compareData.length > 0;
 
     const startValue = data[0]?.portfolioValue || 0;
     const endValue = data[data.length - 1]?.portfolioValue || 0;
@@ -52,8 +66,13 @@ export function NAVChart({ data, height = 350, symbol }: NAVChartProps) {
     const profit = endValue - totalCost;
     const percentageReturn = totalCost > 0 ? ((endValue - totalCost) / totalCost * 100) : 0;
 
-    const minValue = Math.min(...chartData.map(d => Math.min(d.valueM, d.costM, d.savingsM)));
-    const maxValue = Math.max(...chartData.map(d => Math.max(d.valueM, d.costM, d.savingsM)));
+    const allValues = chartData.flatMap(d => {
+        const vals = [d.valueM, d.costM, d.savingsM];
+        if (d.compareM !== undefined) vals.push(d.compareM);
+        return vals;
+    });
+    const minValue = Math.min(...allValues);
+    const maxValue = Math.max(...allValues);
     const padding = (maxValue - minValue) * 0.1;
 
     return (
@@ -63,12 +82,14 @@ export function NAVChart({ data, height = 350, symbol }: NAVChartProps) {
                     <div>
                         <CardTitle className="text-sm flex items-center gap-2 text-slate-200">
                             <Wallet className="w-4 h-4 text-emerald-400" />
-                            GIÁ TRỊ DANH MỤC - {symbol}
+                            GIÁ TRỊ DANH MỤC - {symbol}{hasCompare ? ` vs ${compareSymbol}` : ''}
                         </CardTitle>
                         <CardDescription className="text-xs mt-1 text-slate-500">
-                            <span className="text-emerald-400">■</span> Danh mục
+                            <span className="text-emerald-400">■</span> {symbol}
                             <span className="text-slate-400 ml-3">■</span> Vốn đầu tư
                             <span className="text-amber-400 ml-3">- -</span> Tiết kiệm 6.5%
+                            {hasCompare && <span className="text-purple-400 ml-3">■</span>}
+                            {hasCompare && ` ${compareSymbol}`}
                         </CardDescription>
                     </div>
                     <div className="flex flex-col items-end gap-1">
@@ -94,6 +115,10 @@ export function NAVChart({ data, height = 350, symbol }: NAVChartProps) {
                             <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="#64748b" stopOpacity={0.3} />
                                 <stop offset="100%" stopColor="#64748b" stopOpacity={0.05} />
+                            </linearGradient>
+                            <linearGradient id="compareGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#a855f7" stopOpacity={0.3} />
+                                <stop offset="100%" stopColor="#a855f7" stopOpacity={0.05} />
                             </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
@@ -121,9 +146,10 @@ export function NAVChart({ data, height = 350, symbol }: NAVChartProps) {
                             labelStyle={{ color: '#94a3b8', fontSize: 11 }}
                             formatter={(value, name) => {
                                 const labels: Record<string, string> = {
-                                    valueM: 'Danh mục',
+                                    valueM: symbol,
                                     costM: 'Vốn đầu tư',
                                     savingsM: 'Tiết kiệm',
+                                    compareM: compareSymbol || 'So sánh',
                                 };
                                 const val = typeof value === 'number' ? value : 0;
                                 const n = name ?? '';
@@ -161,6 +187,19 @@ export function NAVChart({ data, height = 350, symbol }: NAVChartProps) {
                             fill="url(#navGradient)"
                             dot={false}
                         />
+
+                        {/* Compare stock area */}
+                        {hasCompare && (
+                            <Area
+                                type="monotone"
+                                dataKey="compareM"
+                                stroke="#a855f7"
+                                strokeWidth={2}
+                                fill="url(#compareGradient)"
+                                dot={false}
+                                connectNulls
+                            />
+                        )}
                     </AreaChart>
                 </ResponsiveContainer>
             </div>

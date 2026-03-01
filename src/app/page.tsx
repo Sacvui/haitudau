@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [compareResult, setCompareResult] = useState<InvestmentResult | null>(null);
   const [priceData, setPriceData] = useState<PriceDataPoint[]>([]);
   const [navData, setNavData] = useState<{ date: string; portfolioValue: number; totalCost: number; savingsValue: number }[]>([]);
+  const [compareNavData, setCompareNavData] = useState<{ date: string; portfolioValue: number; totalCost: number; savingsValue: number }[]>([]);
   const [dividendData, setDividendData] = useState<DividendEvent[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -79,6 +80,7 @@ export default function DashboardPage() {
     setLoading(true);
     setResult(null);
     setCompareResult(null);
+    setCompareNavData([]);
 
     try {
       // 1. Analyze primary stock
@@ -102,6 +104,26 @@ export default function DashboardPage() {
         const compareData = await analyzeStock(formData.compareSymbol);
         if (compareData) {
           setCompareResult(compareData.result);
+
+          // Generate compare NAV data
+          const compareTimeline = compareData.result.timeline || [];
+          if (compareTimeline.length > 0) {
+            let compareTotalCost = formData.initialAmount;
+            const compareNavPoints = compareTimeline
+              .filter((e: TimelineEvent) => e.portfolioValue > 0)
+              .map((e: TimelineEvent) => {
+                if (e.type === 'buy' || e.type === 'deposit') {
+                  compareTotalCost += e.shares * e.pricePerShare;
+                }
+                return {
+                  date: e.date,
+                  portfolioValue: e.portfolioValue,
+                  totalCost: compareTotalCost,
+                  savingsValue: 0,
+                };
+              });
+            setCompareNavData(compareNavPoints);
+          }
 
           // Merge compare prices into primary data
           const compareMap = new Map(compareData.prices.map((p: PriceDataPoint) => [p.date, p.close]));
@@ -253,8 +275,10 @@ export default function DashboardPage() {
                     <div className="xl:col-span-8">
                       <NAVChart
                         data={navData}
+                        compareData={compareNavData.length > 0 ? compareNavData : undefined}
                         height={350}
                         symbol={result.symbol}
+                        compareSymbol={compareResult?.symbol}
                       />
                     </div>
 
