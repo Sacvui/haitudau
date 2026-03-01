@@ -55,7 +55,7 @@ async function fetchHistory(symbol: string): Promise<{ closes: number[]; volumes
         const res = await axios.get('https://iboard.ssi.com.vn/dchart/api/history', {
             params: { resolution: 'D', symbol, from: startTs, to: endTs },
             headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://iboard.ssi.com.vn/' },
-            timeout: 6000
+            timeout: 4000
         });
         const d = res.data;
         if (d.s === 'ok' && d.c && d.c.length >= 15) {
@@ -72,67 +72,66 @@ async function fetchHistory(symbol: string): Promise<{ closes: number[]; volumes
 async function rankVN30(): Promise<StockSnapshot[]> {
     const results: StockSnapshot[] = [];
 
-    // Fetch all in parallel (batches of 10 to avoid rate-limiting)
+    const processSymbol = async (symbol: string): Promise<StockSnapshot | null> => {
+        const hist = await fetchHistory(symbol);
+        if (!hist || hist.closes.length < 21) return null;
+
+        const closes = hist.closes;
+        const volumes = hist.volumes;
+        const latestPrice = closes[closes.length - 1];
+        const prevPrice = closes[closes.length - 2];
+        const change = latestPrice - prevPrice;
+        const changePct = (change / prevPrice) * 100;
+
+        const ma20Slice = closes.slice(-20);
+        const ma20 = ma20Slice.reduce((a, b) => a + b, 0) / 20;
+
+        const vol20Slice = volumes.slice(-20);
+        const avgVol20 = vol20Slice.reduce((a, b) => a + b, 0) / 20;
+        const latestVol = volumes[volumes.length - 1];
+        const volumeSpike = avgVol20 > 0 ? latestVol / avgVol20 : 1;
+
+        const rsi = computeRSI(closes);
+
+        let signal: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
+        if (rsi < 35 && latestPrice < ma20) signal = 'BUY';
+        else if (rsi > 70 && latestPrice > ma20 * 1.05) signal = 'SELL';
+        else if (latestPrice > ma20 && changePct > 0 && volumeSpike > 1.3) signal = 'BUY';
+        else if (latestPrice < ma20 && changePct < -1) signal = 'SELL';
+
+        const score =
+            Math.abs(changePct) * 2 +
+            (volumeSpike > 1.5 ? volumeSpike * 1.5 : 0) +
+            (rsi < 30 || rsi > 70 ? 3 : 0) +
+            (Math.abs(latestPrice - ma20) / ma20 * 50);
+
+        return {
+            symbol, price: latestPrice, change,
+            changePct: parseFloat(changePct.toFixed(2)),
+            volume: latestVol,
+            avgVolume20: Math.round(avgVol20),
+            rsi14: parseFloat(rsi.toFixed(1)),
+            ma20: Math.round(ma20),
+            score: parseFloat(score.toFixed(2)),
+            signal
+        } as StockSnapshot;
+    };
+
+    // Staggered batches of 10 with 500ms delay to avoid SSI rate-limiting
     for (let batch = 0; batch < VN30.length; batch += 10) {
         const slice = VN30.slice(batch, batch + 10);
-        const batchResults = await Promise.allSettled(
-            slice.map(async (symbol) => {
-                const hist = await fetchHistory(symbol);
-                if (!hist || hist.closes.length < 21) return null;
-
-                const closes = hist.closes;
-                const volumes = hist.volumes;
-                const latestPrice = closes[closes.length - 1];
-                const prevPrice = closes[closes.length - 2];
-                const change = latestPrice - prevPrice;
-                const changePct = (change / prevPrice) * 100;
-
-                // MA-20
-                const ma20Slice = closes.slice(-20);
-                const ma20 = ma20Slice.reduce((a, b) => a + b, 0) / 20;
-
-                // Average Volume 20 days
-                const vol20Slice = volumes.slice(-20);
-                const avgVol20 = vol20Slice.reduce((a, b) => a + b, 0) / 20;
-                const latestVol = volumes[volumes.length - 1];
-                const volumeSpike = avgVol20 > 0 ? latestVol / avgVol20 : 1;
-
-                // RSI-14
-                const rsi = computeRSI(closes);
-
-                // Signal
-                let signal: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
-                if (rsi < 35 && latestPrice < ma20) signal = 'BUY'; // oversold + below MA
-                else if (rsi > 70 && latestPrice > ma20 * 1.05) signal = 'SELL'; // overbought
-                else if (latestPrice > ma20 && changePct > 0 && volumeSpike > 1.3) signal = 'BUY';
-                else if (latestPrice < ma20 && changePct < -1) signal = 'SELL';
-
-                // Scoring (higher = more notable)
-                const score =
-                    Math.abs(changePct) * 2 +
-                    (volumeSpike > 1.5 ? volumeSpike * 1.5 : 0) +
-                    (rsi < 30 || rsi > 70 ? 3 : 0) +
-                    (Math.abs(latestPrice - ma20) / ma20 * 50);
-
-                return {
-                    symbol,
-                    price: latestPrice,
-                    change,
-                    changePct: parseFloat(changePct.toFixed(2)),
-                    volume: latestVol,
-                    avgVolume20: Math.round(avgVol20),
-                    rsi14: parseFloat(rsi.toFixed(1)),
-                    ma20: Math.round(ma20),
-                    score: parseFloat(score.toFixed(2)),
-                    signal
-                } as StockSnapshot;
-            })
-        );
+        console.log(`[DailyReport] Batch ${batch / 10 + 1}: ${slice.join(', ')}`);
+        const batchResults = await Promise.allSettled(slice.map(processSymbol));
         for (const r of batchResults) {
             if (r.status === 'fulfilled' && r.value) results.push(r.value);
         }
+        // Small delay between batches to avoid rate-limiting
+        if (batch + 10 < VN30.length) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
     }
 
+    console.log(`[DailyReport] Successfully ranked ${results.length}/${VN30.length} stocks`);
     return results.sort((a, b) => b.score - a.score);
 }
 

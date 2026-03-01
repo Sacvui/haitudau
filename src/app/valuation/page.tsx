@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
     Calculator, Search, TrendingUp, TrendingDown, Minus,
-    Shield, AlertTriangle, CheckCircle, XCircle, RefreshCw, Loader2, Menu, ChevronDown, ChevronUp, BarChart2
+    Shield, AlertTriangle, CheckCircle, XCircle, RefreshCw, Loader2, Menu, ChevronDown, ChevronUp, BarChart2, Target
 } from 'lucide-react';
 import {
     runFullValuation,
@@ -61,7 +61,7 @@ export default function ValuationPage() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // Reverse DCF State
-    const [activeTab, setActiveTab] = useState<'intrinsic' | 'reverse' | 'peBand'>('intrinsic');
+    const [activeTab, setActiveTab] = useState<'intrinsic' | 'reverse' | 'peBand' | 'recommendation'>('intrinsic');
     const [impliedGrowth, setImpliedGrowth] = useState<number | null>(null);
 
     // Custom params
@@ -244,11 +244,20 @@ export default function ValuationPage() {
                             <button
                                 onClick={() => setActiveTab('peBand')}
                                 className={`px-6 py-3 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'peBand'
-                                        ? 'border-amber-500 text-amber-400'
-                                        : 'border-transparent text-slate-400 hover:text-slate-300'
+                                    ? 'border-amber-500 text-amber-400'
+                                    : 'border-transparent text-slate-400 hover:text-slate-300'
                                     }`}
                             >
                                 <BarChart2 className="w-4 h-4" /> P/E Band
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('recommendation')}
+                                className={`px-6 py-3 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'recommendation'
+                                    ? 'border-emerald-500 text-emerald-400'
+                                    : 'border-transparent text-slate-400 hover:text-slate-300'
+                                    }`}
+                            >
+                                <Target className="w-4 h-4" /> Khuyến Nghị
                             </button>
                         </div>
                     )}
@@ -430,6 +439,129 @@ export default function ValuationPage() {
                                             <p className="text-sm">Không thể hiển thị P/E Band — EPS không hợp lệ (âm hoặc bằng 0).</p>
                                         </div>
                                     )}
+                                </CardContent>
+                            </Card>
+                        </ErrorBoundary>
+                    )}
+
+                    {/* Results - Recommendation (Khuyến Nghị Định Giá) */}
+                    {valuation && fundamentals && activeTab === 'recommendation' && (
+                        <ErrorBoundary>
+                            <Card className="bg-[#111827] border-slate-800 mt-6 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-32 bg-emerald-500/5 blur-3xl rounded-full mix-blend-screen pointer-events-none"></div>
+                                <CardContent className="p-8 relative z-10">
+                                    <h2 className="text-xl font-bold text-slate-200 mb-2 text-center">🎯 Khuyến Nghị Định Giá</h2>
+                                    <p className="text-sm text-slate-400 max-w-2xl mx-auto mb-8 text-center">
+                                        Tổng hợp giá mục tiêu từ 3 phương pháp: Giá Trị Sổ Sách (P/B), Thu Nhập (P/E), và Tăng Trưởng (PEG)
+                                    </p>
+
+                                    {(() => {
+                                        const price = fundamentals.currentPrice;
+                                        const eps = fundamentals.eps;
+                                        const bvps = fundamentals.bvps;
+                                        const roe = fundamentals.roe; // already percentage (e.g. 15)
+                                        const pe = fundamentals.pe;
+                                        const pb = fundamentals.pb;
+                                        const growth = fundamentals.profitGrowth; // already percentage (e.g. 20)
+
+                                        // Method 1: P/B × BVPS — target P/B = max(1.5, ROE/10)
+                                        const fairPB = Math.max(1.5, roe / 10);
+                                        const targetPB = bvps * fairPB;
+
+                                        // Method 2: P/E × EPS — target P/E = max(10, growth rate, industry avg)
+                                        const targetPE_ratio = Math.max(10, Math.min(growth > 0 ? growth : 12, fundamentals.industryPE || 15));
+                                        const targetPE = eps * targetPE_ratio;
+
+                                        // Method 3: PEG-adjusted — use earnings growth
+                                        const peg = growth > 0 ? pe / growth : 2;
+                                        const fairPEG = 1.0; // PEG = 1 is fair
+                                        const targetPEG = growth > 0 ? eps * growth * fairPEG : targetPE;
+
+                                        // Average target
+                                        const targets = [targetPB, targetPE, targetPEG].filter(t => t > 0 && isFinite(t));
+                                        const avgTarget = targets.length > 0 ? targets.reduce((a, b) => a + b, 0) / targets.length : 0;
+                                        const lowTarget = Math.min(...targets);
+                                        const highTarget = Math.max(...targets);
+                                        const upside = avgTarget > 0 ? ((avgTarget - price) / price * 100) : 0;
+
+                                        // Verdict
+                                        let verdict = 'GIỮ';
+                                        let verdictColor = 'text-amber-400';
+                                        let verdictBg = 'bg-amber-500/10 border-amber-500/30';
+                                        let verdictEmoji = '🟡';
+                                        if (upside >= 20) { verdict = 'MUA MẠNH'; verdictColor = 'text-emerald-400'; verdictBg = 'bg-emerald-500/10 border-emerald-500/30'; verdictEmoji = '🟢'; }
+                                        else if (upside >= 10) { verdict = 'MUA'; verdictColor = 'text-emerald-300'; verdictBg = 'bg-emerald-500/10 border-emerald-500/20'; verdictEmoji = '🟢'; }
+                                        else if (upside <= -15) { verdict = 'BÁN'; verdictColor = 'text-rose-400'; verdictBg = 'bg-rose-500/10 border-rose-500/30'; verdictEmoji = '🔴'; }
+                                        else if (upside <= -5) { verdict = 'GIẢM TỶ TRỌNG'; verdictColor = 'text-orange-400'; verdictBg = 'bg-orange-500/10 border-orange-500/30'; verdictEmoji = '🟠'; }
+
+                                        return (
+                                            <div className="space-y-6">
+                                                {/* Big Verdict */}
+                                                <div className={`rounded-2xl border p-6 text-center ${verdictBg}`}>
+                                                    <p className="text-4xl font-black mb-2">{verdictEmoji}</p>
+                                                    <p className={`text-2xl font-black ${verdictColor}`}>{verdict}</p>
+                                                    <p className="text-sm text-slate-400 mt-2">
+                                                        Giá hiện tại <strong className="text-white">{price.toLocaleString()}đ</strong> → Mục tiêu <strong className={verdictColor}>{avgTarget > 0 ? `${Math.round(avgTarget).toLocaleString()}đ` : 'N/A'}</strong>
+                                                    </p>
+                                                    <p className={`text-lg font-bold mt-1 ${upside >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                        {upside >= 0 ? '▲' : '▼'} {Math.abs(upside).toFixed(1)}% {upside >= 0 ? 'tiềm năng tăng' : 'rủi ro giảm'}
+                                                    </p>
+                                                    {targets.length >= 2 && (
+                                                        <p className="text-xs text-slate-500 mt-2">
+                                                            Vùng giá mục tiêu: {Math.round(lowTarget).toLocaleString()}đ — {Math.round(highTarget).toLocaleString()}đ
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* 3 Methods Breakdown */}
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    {/* P/B Method */}
+                                                    <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/50">
+                                                        <p className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">📘 P/B × Giá Trị Sổ Sách</p>
+                                                        <p className="text-2xl font-black text-white">{targetPB > 0 ? `${Math.round(targetPB).toLocaleString()}đ` : 'N/A'}</p>
+                                                        <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
+                                                            <p>BVPS: {bvps.toLocaleString()}đ</p>
+                                                            <p>P/B hiện tại: {pb.toFixed(1)}x → hợp lý: {fairPB.toFixed(1)}x</p>
+                                                            <p>ROE: {roe.toFixed(1)}%</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* P/E Method */}
+                                                    <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/50">
+                                                        <p className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">📊 P/E × Thu Nhập</p>
+                                                        <p className="text-2xl font-black text-white">{targetPE > 0 ? `${Math.round(targetPE).toLocaleString()}đ` : 'N/A'}</p>
+                                                        <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
+                                                            <p>EPS: {eps.toLocaleString()}đ</p>
+                                                            <p>P/E hiện tại: {pe.toFixed(1)}x → hợp lý: {targetPE_ratio.toFixed(1)}x</p>
+                                                            <p>Ngành: {fundamentals.industryPE?.toFixed(1) || 'N/A'}x</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* PEG Method */}
+                                                    <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/50">
+                                                        <p className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">🚀 PEG × Tăng Trưởng</p>
+                                                        <p className="text-2xl font-black text-white">{targetPEG > 0 ? `${Math.round(targetPEG).toLocaleString()}đ` : 'N/A'}</p>
+                                                        <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
+                                                            <p>Tăng trưởng LN: {growth.toFixed(1)}%</p>
+                                                            <p>PEG hiện tại: {peg.toFixed(2)}x → hợp lý: 1.0x</p>
+                                                            <p>{peg < 1 ? '✅ P/E rẻ so với tăng trưởng' : peg > 2 ? '❌ P/E đắt so với tăng trưởng' : '⚠️ P/E hợp lý'}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Summary Text */}
+                                                <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
+                                                    <p className="text-xs text-slate-400 leading-relaxed">
+                                                        💡 <strong className="text-slate-300">Cách đọc:</strong> Giá mục tiêu được tính bằng trung bình 3 phương pháp.
+                                                        P/B dùng cho cổ phiếu ngân hàng/tài chính. P/E phù hợp đa ngành.
+                                                        PEG đánh giá mức giá so với tốc độ tăng trưởng lợi nhuận.
+                                                        <br /><br />
+                                                        ⚠️ Đây là tham khảo dựa trên dữ liệu tài chính. Luôn kết hợp với phân tích kỹ thuật và tin tức trước khi ra quyết định.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </CardContent>
                             </Card>
                         </ErrorBoundary>
