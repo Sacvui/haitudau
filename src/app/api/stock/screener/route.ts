@@ -89,72 +89,92 @@ function getSector(symbol: string): string {
 
 export async function GET(request: NextRequest) {
     try {
-        const url = new Request(request).url;
-        const { searchParams } = new URL(url);
+        const searchParams = request.nextUrl.searchParams;
         const group = searchParams.get('group') || 'vn30';
 
         let targetSymbols = VN30_SYMBOLS;
         if (group === 'vn100') targetSymbols = VN100_SYMBOLS;
         if (group === 'top20') targetSymbols = TOP20_SYMBOLS;
 
-        // 1. Fetch Realtime Prices from SSI
+        // 1. Fetch Realtime Prices from SSI in chunks to avoid URL length limits
         // Using SSI Scoreboard API
         // https://iboard.ssi.com.vn/api/scoreboard/stock-realtime?stockSymbol=ACB,FPT,...
 
-        const symbols = targetSymbols.join(',');
         let realtimeData: any[] = [];
         try {
-            const response = await axios.get(`https://iboard.ssi.com.vn/api/scoreboard/stock-realtime`, {
-                params: { stockSymbol: symbols },
-                headers: {
-                    'User-Agent': 'Mozilla/5.0'
-                },
-                timeout: 5000
+            const SSI_BATCH_SIZE = 40;
+            const chunks = [];
+            for (let i = 0; i < targetSymbols.length; i += SSI_BATCH_SIZE) {
+                chunks.push(targetSymbols.slice(i, i + SSI_BATCH_SIZE));
+            }
+
+            const results = await Promise.allSettled(chunks.map(async (chunk) => {
+                const symbols = chunk.join(',');
+                try {
+                    const res = await fetch(`https://iboard.ssi.com.vn/api/scoreboard/stock-realtime?stockSymbol=${symbols}`, {
+                        headers: { 'User-Agent': 'Mozilla/5.0' },
+                        next: { revalidate: 0 }
+                    });
+                    const json = await res.json();
+                    return Array.isArray(json?.data) ? json.data : [];
+                } catch (e: any) {
+                    console.warn('[Screener] SSI chunk fetch failed:', e.message);
+                    return []; // Safe fallback to empty array
+                }
+            }));
+
+            results.forEach(res => {
+                if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+                    realtimeData.push(...res.value);
+                }
             });
-            realtimeData = response.data?.data || [];
+            // Ensure pure JSON without Symbols
+            realtimeData = JSON.parse(JSON.stringify(realtimeData));
         } catch (err: any) {
             console.warn('[Screener] SSI Realtime API failed, falling back to history:', err.message);
         }
 
-        // Check if all prices are 0 (weekend/off-hours)
-        const allZero = realtimeData.every((q: any) => !q.matchedPrice && !q.refPrice);
-
         // Fallback: fetch last trading day prices from DNSE (VNDirect) when real-time is empty
         // DNSE works 24/7 including weekends, unlike SSI which blocks on Sat/Sun
         let fallbackPrices: Record<string, { close: number; prevClose: number; volume: number }> = {};
+        const allZero = realtimeData.length > 0 && realtimeData.every((q: any) => !q.matchedPrice && !q.refPrice);
+
         if (allZero || realtimeData.length === 0) {
             console.log('[Screener] Real-time prices are all 0 (off-hours). Fetching DNSE fallback...');
             const endTs = Math.floor(Date.now() / 1000);
             const startTs = endTs - 10 * 24 * 60 * 60; // 10 days back
 
-            const BATCH_SIZE = 5;
-            for (let i = 0; i < targetSymbols.length; i += BATCH_SIZE) {
-                const batch = targetSymbols.slice(i, i + BATCH_SIZE);
-                await Promise.allSettled(batch.map(async (sym) => {
+            // CRITICAL FIX: Limit fallback requests to max 30 symbols to prevent Vercel 10s timeout
+            const fallbackTargets = targetSymbols.slice(0, 30);
+            console.log(`[Screener] Restricting fallback history to ${fallbackTargets.length} symbols...`);
+
+            const BATCH_SIZE = 15;
+            for (let i = 0; i < fallbackTargets.length; i += BATCH_SIZE) {
+                const batch = fallbackTargets.slice(i, i + BATCH_SIZE);
+                for (const sym of batch) {
                     try {
-                        const hRes = await axios.get('https://dchart-api.vndirect.com.vn/dchart/history', {
-                            params: { resolution: 'D', symbol: sym, from: startTs, to: endTs },
-                            timeout: 5000
+                        const hRes = await fetch(`https://dchart-api.vndirect.com.vn/dchart/history?resolution=D&symbol=${sym}&from=${startTs}&to=${endTs}`, {
+                            next: { revalidate: 0 }
                         });
-                        const hd = hRes.data;
+                        const hd = await hRes.json();
                         if (hd.s === 'ok' && hd.c && hd.c.length >= 2) {
                             const lastIdx = hd.c.length - 1;
                             fallbackPrices[sym] = {
-                                close: hd.c[lastIdx] * 1000, // DNSE returns in 1000 VND
-                                prevClose: hd.c[lastIdx - 1] * 1000,
-                                volume: hd.v[lastIdx]
+                                close: Number(hd.c[lastIdx]) * 1000,
+                                prevClose: Number(hd.c[lastIdx - 1]) * 1000,
+                                volume: Number(hd.v[lastIdx])
                             };
                         }
                     } catch (e: any) {
                         console.warn(`[Screener] Failed to fetch fallback data for ${sym}:`, e.message);
                     }
-                }));
-                // Tạm nghỉ 300ms giữa các batch để tránh bị Rate Limit (429) từ VNDirect
-                if (i + BATCH_SIZE < targetSymbols.length) {
-                    await new Promise(r => setTimeout(r, 300));
+                }
+                // Tạm nghỉ 50ms giữa các batch để tránh bị Rate Limit (429) từ VNDirect
+                if (i + BATCH_SIZE < fallbackTargets.length) {
+                    await new Promise(r => setTimeout(r, 50));
                 }
             }
-            console.log(`[Screener] DNSE fallback: ${Object.keys(fallbackPrices).length}/${targetSymbols.length} stocks`);
+            console.log(`[Screener] DNSE fallback completed.`);
         }
 
         // 2. Process and Enrich Data
@@ -168,8 +188,9 @@ export async function GET(request: NextRequest) {
             const changePercent = (quote.priceChangePercent || 0) || (fb && fb.prevClose > 0 ? parseFloat(((fb.close - fb.prevClose) / fb.prevClose * 100).toFixed(2)) : 0);
             const volume = (quote.totalVolume || 0) || (fb?.volume || 0);
 
-            // Get Dividend Info
-            const divInfo = (dividendsData as any)[symbol] || [];
+            // Get Dividend Info safely
+            const divInfoRaw = (dividendsData as any)[symbol];
+            const divInfo = Array.isArray(divInfoRaw) ? divInfoRaw : [];
 
             // Calculate Dividend Metrics: find the most recent year with cash dividends
             const lastYearCash = (() => {
@@ -177,12 +198,16 @@ export async function GET(request: NextRequest) {
                 if (cashDivs.length === 0) return 0;
 
                 // Find the latest year in the data
-                const latestYear = Math.max(...cashDivs.map((d: any) => new Date(d.exDate).getFullYear()));
+                const latestYear = Math.max(...cashDivs.map((d: any) => {
+                    const dateVal = d.exDate ? new Date(d.exDate).getFullYear() : 0;
+                    return isNaN(dateVal) ? 0 : dateVal;
+                }));
 
                 // Sum all cash dividends for that latest year
+                if (latestYear === 0) return 0;
                 return cashDivs
                     .filter((d: any) => new Date(d.exDate).getFullYear() === latestYear)
-                    .reduce((sum: number, d: any) => sum + d.value, 0);
+                    .reduce((sum: number, d: any) => sum + (d.value || 0), 0);
             })();
 
             const dividendPerShare = lastYearCash;
@@ -211,14 +236,31 @@ export async function GET(request: NextRequest) {
             };
         });
 
+        const finalData = (enrichedStocks as any[]).map(stock => ({
+            symbol: String(stock.symbol || ''),
+            name: String(stock.name || ''),
+            price: Number(stock.price || 0),
+            currentPrice: Number(stock.currentPrice || 0),
+            change: Number(stock.change || 0),
+            changePercent: Number(stock.changePercent || 0),
+            volume: Number(stock.volume || 0),
+            dividendYield: Number(stock.dividendYield || 0),
+            dividendPerShare: Number(stock.dividendPerShare || 0),
+            dividendHistory: Array.isArray(stock.dividendHistory) ? stock.dividendHistory : [],
+            payoutFrequency: String(stock.payoutFrequency || 'Annually'),
+            sector: String(stock.sector || 'Khác'),
+            marketCap: Number(stock.marketCap || 0),
+            consistencyScore: Number(stock.consistencyScore || 0),
+            stockDividendRatio: Number(stock.stockDividendRatio || 0)
+        }));
+
         return NextResponse.json({
             success: true,
-            count: enrichedStocks.length,
-            data: enrichedStocks
+            data: finalData
         });
 
-    } catch (error) {
-        console.error('Realtime Screener Error:', error);
-        return NextResponse.json({ success: false, error: 'Failed to fetch realtime data' }, { status: 500 });
+    } catch (err: any) {
+        console.error('[Screener Route Error]:', err);
+        return NextResponse.json({ success: false, error: 'Failed to fetch realtime data', details: err.message }, { status: 500 });
     }
 }

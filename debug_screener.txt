@@ -1,0 +1,1 @@
+STEP ERR: Inside Catch - Cannot read private member #state from an object whose class did not declare it
