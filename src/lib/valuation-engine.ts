@@ -35,6 +35,7 @@ export interface ValuationSummary {
     overallMargin: number;
     overallVerdict: 'CHEAP' | 'FAIR' | 'EXPENSIVE';
     results: ValuationResult[];
+    marketSentimentScore?: number;
 }
 
 // ===================== CORE METHODS =====================
@@ -165,7 +166,8 @@ export function calculateReverseDCF(
 
 export function calculateMarginOfSafety(
     intrinsicValue: number,
-    currentPrice: number
+    currentPrice: number,
+    sentimentScore: number = 50 // Default neutral
 ): { margin: number; verdict: 'CHEAP' | 'FAIR' | 'EXPENSIVE' | 'N/A' } {
     if (intrinsicValue <= 0 || currentPrice <= 0) {
         return { margin: 0, verdict: 'N/A' };
@@ -173,10 +175,24 @@ export function calculateMarginOfSafety(
 
     const margin = ((intrinsicValue - currentPrice) / intrinsicValue) * 100;
 
+    // Adjust thresholds based on Fear & Greed
+    // Greed (75+) -> Stricter buy criteria (+10% margin needed)
+    // Fear (25-) -> Looser buy criteria (-10% margin needed)
+    let cheapThreshold = 25;
+    let fairThreshold = -10;
+
+    if (sentimentScore >= 75) {
+        cheapThreshold = 35;
+        fairThreshold = 0;
+    } else if (sentimentScore <= 25) {
+        cheapThreshold = 15;
+        fairThreshold = -25;
+    }
+
     let verdict: 'CHEAP' | 'FAIR' | 'EXPENSIVE';
-    if (margin >= 25) verdict = 'CHEAP';         // >25% discount = undervalued
-    else if (margin >= -10) verdict = 'FAIR';    // -10% to +25% = fairly valued
-    else verdict = 'EXPENSIVE';                   // >10% premium = overvalued
+    if (margin >= cheapThreshold) verdict = 'CHEAP';
+    else if (margin >= fairThreshold) verdict = 'FAIR';
+    else verdict = 'EXPENSIVE';
 
     return { margin, verdict };
 }
@@ -220,8 +236,10 @@ export function runFullValuation(
         requiredReturn?: number;   // Default: 12%
         epsGrowthRate?: number;    // Default: based on ROE
         projectionYears?: number;  // Default: 10
+        marketSentimentScore?: number; // Default: 50
     }
 ): ValuationSummary {
+    const sentimentScore = customParams?.marketSentimentScore ?? 50;
     const requiredReturn = (customParams?.requiredReturn || 12) / 100;
     const epsGrowth = (customParams?.epsGrowthRate ?? Math.min(input.roe * 0.6, 25)) / 100; // ROE × retention ratio
     const projYears = customParams?.projectionYears || 10;
@@ -231,7 +249,7 @@ export function runFullValuation(
 
     // 1. DDM - Gordon Growth
     const ddmValue = gordonGrowthModel(input.lastDividend, divGrowth, requiredReturn);
-    const ddmMos = calculateMarginOfSafety(ddmValue, input.currentPrice);
+    const ddmMos = calculateMarginOfSafety(ddmValue, input.currentPrice, sentimentScore);
     results.push({
         method: 'DDM - Gordon Growth',
         methodKey: 'ddm',
@@ -255,7 +273,7 @@ export function runFullValuation(
 
     // 2. P/E Relative Valuation
     const peValue = peRelativeValuation(input.eps, input.industryPE);
-    const peMos = calculateMarginOfSafety(peValue, input.currentPrice);
+    const peMos = calculateMarginOfSafety(peValue, input.currentPrice, sentimentScore);
     results.push({
         method: 'P/E Tương Đối',
         methodKey: 'pe',
@@ -276,7 +294,7 @@ export function runFullValuation(
 
     // 3. Graham Number
     const grahamValue = grahamNumber(input.eps, input.bvps);
-    const grahamMos = calculateMarginOfSafety(grahamValue, input.currentPrice);
+    const grahamMos = calculateMarginOfSafety(grahamValue, input.currentPrice, sentimentScore);
     results.push({
         method: 'Số Graham',
         methodKey: 'graham',
@@ -297,7 +315,7 @@ export function runFullValuation(
 
     // 4. Simplified DCF
     const dcfValue = simplifiedDCF(input.eps, epsGrowth, requiredReturn, projYears);
-    const dcfMos = calculateMarginOfSafety(dcfValue, input.currentPrice);
+    const dcfMos = calculateMarginOfSafety(dcfValue, input.currentPrice, sentimentScore);
     results.push({
         method: 'DCF Đơn Giản',
         methodKey: 'dcf',
@@ -339,7 +357,7 @@ export function runFullValuation(
         ? adjustedResults.reduce((sum, r) => sum + r.intrinsicValue * r.adjConfidence, 0) / totalWeight
         : 0;
 
-    const overallMos = calculateMarginOfSafety(weightedAvg, input.currentPrice);
+    const overallMos = calculateMarginOfSafety(weightedAvg, input.currentPrice, sentimentScore);
 
     return {
         averageIntrinsic: weightedAvg,
@@ -347,5 +365,6 @@ export function runFullValuation(
         overallMargin: overallMos.margin,
         overallVerdict: overallMos.verdict === 'N/A' ? 'FAIR' : overallMos.verdict,
         results,
+        marketSentimentScore: sentimentScore
     };
 }

@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
+import MarketSentimentGauge from '@/components/MarketSentimentGauge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -68,6 +69,23 @@ export default function ValuationPage() {
     // Custom params
     const [requiredReturn, setRequiredReturn] = useState(12);
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [sentiment, setSentiment] = useState<{ score: number; label: string; color: string; breakdown: any } | null>(null);
+
+    // Fetch Market Sentiment on mount
+    useEffect(() => {
+        const fetchSentiment = async () => {
+            try {
+                const res = await fetch('/api/market/sentiment');
+                const data = await res.json();
+                if (data.success) {
+                    setSentiment(data);
+                }
+            } catch (e) {
+                console.error('Failed to fetch sentiment:', e);
+            }
+        };
+        fetchSentiment();
+    }, []);
 
     const handleValuate = useCallback(async () => {
         if (!symbol.trim()) return;
@@ -102,7 +120,10 @@ export default function ValuationPage() {
                 dividendYield: data.dividendYield,
             };
 
-            const result = runFullValuation(input, { requiredReturn });
+            const result = runFullValuation(input, {
+                requiredReturn,
+                marketSentimentScore: sentiment?.score || 50
+            });
             setValuation(result);
 
             // Generate sensitivity table
@@ -119,7 +140,7 @@ export default function ValuationPage() {
         } finally {
             setLoading(false);
         }
-    }, [symbol, requiredReturn]);
+    }, [symbol, requiredReturn, sentiment]);
 
     // Auto-load from URL params (when navigating from homepage search)
     useEffect(() => {
@@ -162,25 +183,37 @@ export default function ValuationPage() {
                         </div>
                     </div>
 
-                    {/* Input Bar */}
-                    <Card className="bg-[#111827] border-slate-800">
-                        <CardContent className="p-4">
-                            <div className="flex flex-col sm:flex-row gap-3 items-end">
-                                <div className="flex-1">
-                                    <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Mã cổ phiếu</label>
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    {/* Header Section */}
+                    <div className="flex flex-col lg:flex-row gap-6 mb-8">
+                        {/* Search Card */}
+                        <Card className="flex-1 bg-[#111827] border-slate-800 shadow-xl overflow-hidden relative">
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 z-0" />
+                            <CardHeader className="relative z-10 pb-2">
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Mã Cổ Phiếu</p>
+                                <div className="flex gap-3">
+                                    <div className="relative flex-1 group">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
                                         <input
                                             type="text"
                                             value={symbol}
                                             onChange={(e) => setSymbol(e.target.value.toUpperCase())}
                                             onKeyDown={(e) => e.key === 'Enter' && handleValuate()}
-                                            placeholder="VD: FPT, VNM, VCB..."
-                                            className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                                            placeholder="VD: FPT, VNM, HPG..."
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-bold placeholder:text-slate-600"
                                         />
                                     </div>
+                                    <Button
+                                        id="btn-valuate"
+                                        onClick={handleValuate}
+                                        disabled={loading || !symbol}
+                                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold px-8 rounded-xl h-auto shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
+                                    >
+                                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Calculator className="w-5 h-5 mr-2" />}
+                                        ĐỊNH GIÁ
+                                    </Button>
                                 </div>
-
+                            </CardHeader>
+                            <CardContent className="relative z-10 pt-0">
                                 <button
                                     onClick={() => setShowAdvanced(!showAdvanced)}
                                     className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors px-3 py-3"
@@ -189,39 +222,44 @@ export default function ValuationPage() {
                                     Tùy chỉnh
                                 </button>
 
-                                <Button
-                                    id="btn-valuate"
-                                    onClick={handleValuate}
-                                    disabled={loading || !symbol.trim()}
-                                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold px-8 py-3 rounded-xl"
-                                >
-                                    {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Calculator className="w-4 h-4 mr-2" />}
-                                    ĐỊNH GIÁ
-                                </Button>
-                            </div>
+                                {showAdvanced && (
+                                    <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Lãi suất yêu cầu (%)</label>
+                                            <input
+                                                type="number"
+                                                value={requiredReturn}
+                                                onChange={(e) => setRequiredReturn(Number(e.target.value))}
+                                                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:border-indigo-500 focus:outline-none"
+                                                min={5} max={25} step={0.5}
+                                            />
+                                        </div>
+                                        <div className="sm:col-span-2 flex items-end">
+                                            <p className="text-xs text-slate-500">
+                                                💡 Lãi suất yêu cầu (r) là mức sinh lời tối thiểu bạn mong đợi. 12% là mức phổ biến tại VN.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
 
-                            {showAdvanced && (
-                                <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Lãi suất yêu cầu (%)</label>
-                                        <input
-                                            type="number"
-                                            value={requiredReturn}
-                                            onChange={(e) => setRequiredReturn(Number(e.target.value))}
-                                            className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:border-indigo-500 focus:outline-none"
-                                            min={5} max={25} step={0.5}
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-2 flex items-end">
-                                        <p className="text-xs text-slate-500">
-                                            💡 Required Return (r) = lãi suất mà bạn yêu cầu cho rủi ro. Mặc định 12% phù hợp thị trường VN.
-                                            Tăng r → giảm giá trị nội tại → đánh giá bảo thủ hơn.
-                                        </p>
-                                    </div>
-                                </div>
+                        {/* Market Sentiment Gauge */}
+                        <div className="lg:w-80">
+                            {sentiment ? (
+                                <MarketSentimentGauge
+                                    score={sentiment.score}
+                                    label={sentiment.label}
+                                    color={sentiment.color}
+                                    breakdown={sentiment.breakdown}
+                                />
+                            ) : (
+                                <Card className="h-full bg-[#111827] border-slate-800 flex items-center justify-center p-6">
+                                    <Loader2 className="w-8 h-8 text-indigo-500/30 animate-spin" />
+                                </Card>
                             )}
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
                     {/* Error */}
                     {error && (
@@ -611,8 +649,8 @@ export default function ValuationPage() {
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }
 
