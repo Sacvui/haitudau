@@ -21,7 +21,9 @@ import {
     Calendar,
     ChevronLeft,
     Gift,
-    ArrowRight
+    ArrowRight,
+    ArrowLeft,
+    PieChart
 } from 'lucide-react';
 import Link from 'next/link';
 import { ScreenerSkeleton } from '@/components/ui/skeleton';
@@ -32,6 +34,8 @@ interface StockDividendData {
     symbol: string;
     name: string;
     currentPrice: number;
+    changePercent: number; // For short term rec
+    volume: number;        // For short term rec
     dividendPerShare: number;
     dividendYield: number;
     dividendHistory: { year: number; dividend: number; yield: number }[];
@@ -176,6 +180,18 @@ export default function DividendScreenerPage() {
         return { label: 'Trung Bình', color: 'bg-slate-500/20 text-slate-400 border-slate-500/50', icon: '➖' };
     };
 
+    const getShortTermRec = (stock: StockDividendData) => {
+        if (stock.changePercent >= 1.5) return { label: 'TÍCH CỰC', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' };
+        if (stock.changePercent <= -1.5) return { label: 'TIÊU CỰC', color: 'text-rose-400 bg-rose-500/10 border-rose-500/30' };
+        return { label: 'TRUNG LẬP', color: 'text-slate-400 bg-slate-500/10 border-slate-500/30' };
+    };
+
+    const getLongTermRec = (stock: StockDividendData) => {
+        if (stock.consistencyScore >= 4 && stock.dividendYield >= 5) return { label: 'MUA', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' };
+        if (stock.consistencyScore >= 3 || stock.dividendYield >= 3) return { label: 'NẮM GIỮ', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' };
+        return { label: 'ĐỨNG NGOÀI', color: 'text-slate-400 bg-slate-500/10 border-slate-500/30' };
+    };
+
     const stats = useMemo(() => {
         if (filteredStocks.length === 0) return { count: 0, maxYield: 0, avgYield: 0, fiveStarCount: 0 };
         return {
@@ -228,6 +244,24 @@ export default function DividendScreenerPage() {
     return (
         <div className="min-h-screen bg-[#0a0f1a] p-4 md:p-6 custom-scrollbar">
             <div className="max-w-7xl mx-auto space-y-6">
+
+                {/* Navigation Header */}
+                <div className="flex items-center justify-between mb-2">
+                    <Link href="/" className="flex items-center gap-2 group">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:shadow-indigo-500/25 transition-all">
+                            <PieChart className="w-5 h-5 text-white" />
+                        </div>
+                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
+                            HẢI TỰ ĐẦU
+                        </span>
+                    </Link>
+                    <Link href="/">
+                        <Button variant="ghost" className="text-slate-400 hover:text-white">
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Về Trang Chủ
+                        </Button>
+                    </Link>
+                </div>
 
                 {/* Unified Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -425,7 +459,8 @@ export default function DividendScreenerPage() {
                                                         Ổn định <ArrowUpDown className={`w-3 h-3 ${sortField === 'consistencyScore' ? 'text-indigo-400' : ''}`} />
                                                     </span>
                                                 </th>
-                                                <th className="p-3 text-right text-xs font-bold text-slate-400 uppercase">Ngành</th>
+                                                <th className="p-3 text-center text-xs font-bold text-slate-400 uppercase">KN Ngắn Hạn</th>
+                                                <th className="p-3 text-center text-xs font-bold text-slate-400 uppercase">KN Dài Hạn</th>
                                                 <th className="p-3 text-center text-xs font-bold text-slate-400 uppercase">Hành động</th>
                                             </tr>
                                         </thead>
@@ -470,11 +505,20 @@ export default function DividendScreenerPage() {
                                                                 {renderStars(stock.consistencyScore)}
                                                             </div>
                                                         </td>
-                                                        <td className="p-3 text-right text-slate-400 text-xs">{stock.sector}</td>
                                                         <td className="p-3 text-center">
-                                                            <Link href={`/?symbol=${stock.symbol}`}>
+                                                            <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-xs font-bold border ${getShortTermRec(stock).color}`}>
+                                                                {getShortTermRec(stock).label}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-xs font-bold border ${getLongTermRec(stock).color}`}>
+                                                                {getLongTermRec(stock).label}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <Link href={`/valuation?symbol=${stock.symbol}`}>
                                                                 <Button size="sm" variant="ghost" className="text-indigo-400 hover:text-indigo-300">
-                                                                    Phân tích <ChevronRight className="w-4 h-4" />
+                                                                    Định giá <ChevronRight className="w-4 h-4" />
                                                                 </Button>
                                                             </Link>
                                                         </td>
