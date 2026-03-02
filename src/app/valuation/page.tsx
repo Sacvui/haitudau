@@ -715,8 +715,8 @@ function MethodCard({ result, currentPrice }: { result: ValuationResult; current
                 <div className="flex items-center justify-between">
                     <div>
                         <p className="text-[10px] text-slate-500 uppercase font-bold">Giá nội tại</p>
-                        <p className={`text-2xl font-black font-mono ${isValid ? config.color : 'text-slate-600'}`}>
-                            {isValid ? `${(result.intrinsicValue / 1000).toFixed(1)}k` : 'N/A'}
+                        <p className={`text-2xl font-black ${isValid ? config.color + ' font-mono' : 'text-slate-600 text-lg'}`}>
+                            {isValid ? `${(result.intrinsicValue / 1000).toFixed(1)}k` : result.method.includes('Gordon') ? 'Không áp dụng' : 'N/A'}
                         </p>
                     </div>
                     <div className="text-right">
@@ -758,13 +758,15 @@ function MethodCard({ result, currentPrice }: { result: ValuationResult; current
                     {Object.entries(result.inputs).map(([key, value]) => (
                         <div key={key} className="flex justify-between text-xs">
                             <span className="text-slate-500">{key}</span>
-                            <span className="text-slate-300 font-mono">{value}</span>
+                            <span className="text-slate-300 font-mono">{isValid ? value : '0 đ'}</span>
                         </div>
                     ))}
                 </div>
 
                 {/* Note */}
-                <p className="text-[10px] text-slate-500 italic pt-1">{result.notes}</p>
+                <p className={`text-[10px] italic pt-1 ${!isValid && result.method.includes('Gordon') ? 'text-amber-500/80 font-medium' : 'text-slate-500'}`}>
+                    {!isValid && result.method.includes('Gordon') ? '⚠️ Không áp dụng: Cổ phiếu không trả cổ tức tiền mặt đều đặn.' : result.notes}
+                </p>
             </CardContent>
         </Card>
     );
