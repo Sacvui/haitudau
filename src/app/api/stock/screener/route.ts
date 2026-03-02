@@ -79,26 +79,32 @@ export async function GET(request: NextRequest) {
             const endTs = Math.floor(Date.now() / 1000);
             const startTs = endTs - 10 * 24 * 60 * 60; // 10 days back
 
-            for (const sym of VN30_SYMBOLS) {
-                try {
-                    const hRes = await axios.get('https://dchart-api.vndirect.com.vn/dchart/history', {
-                        params: { resolution: 'D', symbol: sym, from: startTs, to: endTs },
-                        timeout: 5000
-                    });
-                    const hd = hRes.data;
-                    if (hd.s === 'ok' && hd.c && hd.c.length >= 2) {
-                        const lastIdx = hd.c.length - 1;
-                        fallbackPrices[sym] = {
-                            close: hd.c[lastIdx] * 1000, // DNSE returns in 1000 VND
-                            prevClose: hd.c[lastIdx - 1] * 1000,
-                            volume: hd.v[lastIdx]
-                        };
+            const BATCH_SIZE = 5;
+            for (let i = 0; i < VN30_SYMBOLS.length; i += BATCH_SIZE) {
+                const batch = VN30_SYMBOLS.slice(i, i + BATCH_SIZE);
+                await Promise.allSettled(batch.map(async (sym) => {
+                    try {
+                        const hRes = await axios.get('https://dchart-api.vndirect.com.vn/dchart/history', {
+                            params: { resolution: 'D', symbol: sym, from: startTs, to: endTs },
+                            timeout: 5000
+                        });
+                        const hd = hRes.data;
+                        if (hd.s === 'ok' && hd.c && hd.c.length >= 2) {
+                            const lastIdx = hd.c.length - 1;
+                            fallbackPrices[sym] = {
+                                close: hd.c[lastIdx] * 1000, // DNSE returns in 1000 VND
+                                prevClose: hd.c[lastIdx - 1] * 1000,
+                                volume: hd.v[lastIdx]
+                            };
+                        }
+                    } catch (e: any) {
+                        console.warn(`[Screener] Failed to fetch fallback data for ${sym}:`, e.message);
                     }
-                } catch (e: any) {
-                    console.warn(`[Screener] Failed to fetch fallback data for ${sym}:`, e.message);
+                }));
+                // Tạm nghỉ 300ms giữa các batch để tránh bị Rate Limit (429) từ VNDirect
+                if (i + BATCH_SIZE < VN30_SYMBOLS.length) {
+                    await new Promise(r => setTimeout(r, 300));
                 }
-                // Tạm nghỉ 200ms để tránh bị Rate Limit (429) từ VNDirect
-                await new Promise(r => setTimeout(r, 200));
             }
             console.log(`[Screener] DNSE fallback: ${Object.keys(fallbackPrices).length}/${VN30_SYMBOLS.length} stocks`);
         }
