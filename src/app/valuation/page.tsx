@@ -246,7 +246,7 @@ export default function ValuationPage() {
                                     : 'border-transparent text-slate-400 hover:text-slate-300'
                                     }`}
                             >
-                                <Calculator className="w-4 h-4" /> Định Giá Cơ Bản
+                                <Calculator className="w-4 h-4" /> Giá Trị Nội Tại (Dài Hạn)
                             </button>
                             <button
                                 onClick={() => setActiveTab('reverse')}
@@ -273,7 +273,7 @@ export default function ValuationPage() {
                                     : 'border-transparent text-slate-400 hover:text-slate-300'
                                     }`}
                             >
-                                <Target className="w-4 h-4" /> Khuyến Nghị
+                                <Target className="w-4 h-4" /> Giá Mục Tiêu (Ngắn Hạn)
                             </button>
                         </div>
                     )}
@@ -466,9 +466,9 @@ export default function ValuationPage() {
                             <Card className="bg-[#111827] border-slate-800 mt-6 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-32 bg-emerald-500/5 blur-3xl rounded-full mix-blend-screen pointer-events-none"></div>
                                 <CardContent className="p-8 relative z-10">
-                                    <h2 className="text-xl font-bold text-slate-200 mb-2 text-center">🎯 Khuyến Nghị Định Giá</h2>
+                                    <h2 className="text-xl font-bold text-slate-200 mb-2 text-center">🎯 Giá Mục Tiêu Bằng PP Tương Đối (Ngắn/Trung Hạn)</h2>
                                     <p className="text-sm text-slate-400 max-w-2xl mx-auto mb-8 text-center">
-                                        Tổng hợp giá mục tiêu từ 3 phương pháp: Giá Trị Sổ Sách (P/B), Thu Nhập (P/E), và Tăng Trưởng (PEG)
+                                        Giá mục tiêu kỳ vọng dựa trên so sánh P/B, P/E trung bình ngành và tốc độ Tăng Trường (PEG). Khác với Giá Trị Nội Tại (Dài hạn), mức giá này phản ánh kỳ vọng của dòng tiền trên thị trường hiện tại.
                                     </p>
 
                                     {(() => {
@@ -627,7 +627,7 @@ function SummaryCard({ valuation, fundamentals }: { valuation: ValuationSummary;
             <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
-                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Kết quả định giá</p>
+                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Định giá nội tại (Dài Hạn)</p>
                         <h2 className="text-3xl font-black text-white flex items-center gap-3">
                             {fundamentals.symbol}
                             <Badge className={`${config.bg} ${config.color} text-sm font-bold px-3 py-1`}>
