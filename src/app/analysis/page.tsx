@@ -83,25 +83,26 @@ export default function AnalysisPage() {
         try {
             const res = await fetch('/api/daily-report?key=' + (process.env.NEXT_PUBLIC_GEMINI_KEY_PREFIX || ''));
             const data = await res.json();
-            if (data.success) {
-                // Convert API response to DailyReport format
+
+            if (res.ok && !data.error) {
+                // Convert API response to DailyReport DB format for UI consistency
                 setReport({
-                    report_date: data.date,
-                    symbol_1: data.picks.symbol_1,
-                    symbol_2: data.picks.symbol_2,
-                    market_summary: data.market_summary,
-                    analysis_1: data.analysis_1,
-                    analysis_2: data.analysis_2,
-                    signal_1: data.picks.signal_1,
-                    signal_2: data.picks.signal_2,
-                    raw_data: data.raw,
+                    report_date: new Date().toISOString().split('T')[0],
+                    symbol_1: data.raw?.stock1?.symbol || data.top5?.[0]?.symbol || '',
+                    symbol_2: data.raw?.stock2?.symbol || data.top5?.[1]?.symbol || '',
+                    market_summary: data.market_summary || 'Không có dữ liệu',
+                    analysis_1: data.analysis_1 || 'Không có dữ liệu',
+                    analysis_2: data.analysis_2 || 'Không có dữ liệu',
+                    signal_1: data.raw?.stock1?.signal || 'HOLD',
+                    signal_2: data.raw?.stock2?.signal || 'HOLD',
+                    raw_data: data.raw || { stock1: data.top5?.[0], stock2: data.top5?.[1] },
                     created_at: new Date().toISOString(),
                 });
             } else {
-                setError(data.error || 'Không thể tạo báo cáo');
+                setError(data.error || 'Server trả về lỗi không xác định.');
             }
         } catch (err: any) {
-            setError(err.message || 'Lỗi khi tạo báo cáo');
+            setError(err.message || 'Lỗi khi kết nối đến AI Server.');
         } finally {
             setGenerating(false);
         }

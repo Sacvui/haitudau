@@ -50,3 +50,17 @@ export interface UserPortfolio {
   end_date?: string;
   created_at?: string;
 }
+
+export interface DailyReport {
+  id?: string;
+  report_date: string;
+  symbol_1: string;
+  symbol_2: string;
+  market_summary?: string;
+  analysis_1: string;
+  analysis_2: string;
+  signal_1?: string;
+  signal_2?: string;
+  raw_data?: any;
+  created_at?: string;
+}
