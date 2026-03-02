@@ -54,7 +54,20 @@ interface DividendEvent {
     description: string;
 }
 
-type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol';
+type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol' | 'shortTermRec' | 'longTermRec';
+
+// Recommendations Scoring Helpers (for sorting)
+const getShortTermScore = (stock: StockDividendData) => {
+    if (stock.changePercent >= 1.5) return 3; // TÍCH CỰC
+    if (stock.changePercent <= -1.5) return 1; // TIÊU CỰC
+    return 2; // TRUNG LẬP
+};
+
+const getLongTermScore = (stock: StockDividendData) => {
+    if (stock.consistencyScore >= 4 && stock.dividendYield >= 5) return 3; // MUA
+    if (stock.consistencyScore >= 3 || stock.dividendYield >= 3) return 2; // NẮM GIỮ
+    return 1; // ĐỨNG NGOÀI
+};
 
 // Parse calendar data from JSON
 const ALL_DIVIDENDS: DividendEvent[] = Object.entries(dividendsData).flatMap(([symbol, events]) =>
@@ -154,7 +167,9 @@ export default function DividendScreenerPage() {
             })
             .sort((a, b) => {
                 const multiplier = sortAsc ? 1 : -1;
-                return (a[sortField] > b[sortField] ? 1 : -1) * multiplier;
+                if (sortField === 'shortTermRec') return (getShortTermScore(a) > getShortTermScore(b) ? 1 : -1) * multiplier;
+                if (sortField === 'longTermRec') return (getLongTermScore(a) > getLongTermScore(b) ? 1 : -1) * multiplier;
+                return ((a[sortField as keyof StockDividendData] ?? 0) > (b[sortField as keyof StockDividendData] ?? 0) ? 1 : -1) * multiplier;
             });
     }, [stocks, searchQuery, filter, sortField, sortAsc]);
 
@@ -459,8 +474,22 @@ export default function DividendScreenerPage() {
                                                         Ổn định <ArrowUpDown className={`w-3 h-3 ${sortField === 'consistencyScore' ? 'text-indigo-400' : ''}`} />
                                                     </span>
                                                 </th>
-                                                <th className="p-3 text-center text-xs font-bold text-slate-400 uppercase">KN Ngắn Hạn</th>
-                                                <th className="p-3 text-center text-xs font-bold text-slate-400 uppercase">KN Dài Hạn</th>
+                                                <th
+                                                    className="p-3 text-center text-xs font-bold text-slate-400 uppercase cursor-pointer hover:text-white transition-colors"
+                                                    onClick={() => handleSort('shortTermRec')}
+                                                >
+                                                    <span className="flex items-center justify-center gap-1">
+                                                        KN Ngắn Hạn <ArrowUpDown className={`w-3 h-3 ${sortField === 'shortTermRec' ? 'text-indigo-400' : ''}`} />
+                                                    </span>
+                                                </th>
+                                                <th
+                                                    className="p-3 text-center text-xs font-bold text-slate-400 uppercase cursor-pointer hover:text-white transition-colors"
+                                                    onClick={() => handleSort('longTermRec')}
+                                                >
+                                                    <span className="flex items-center justify-center gap-1">
+                                                        KN Dài Hạn <ArrowUpDown className={`w-3 h-3 ${sortField === 'longTermRec' ? 'text-indigo-400' : ''}`} />
+                                                    </span>
+                                                </th>
                                                 <th className="p-3 text-center text-xs font-bold text-slate-400 uppercase">Hành động</th>
                                             </tr>
                                         </thead>
