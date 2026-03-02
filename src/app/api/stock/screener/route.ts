@@ -9,6 +9,24 @@ const VN30_SYMBOLS = [
     'TCB', 'TPB', 'VCB', 'VHM', 'VIB', 'VIC', 'VJC', 'VNM', 'VPB', 'VRE'
 ];
 
+// VN100 List (Approximation)
+const VN100_SYMBOLS = [
+    ...VN30_SYMBOLS,
+    'AAA', 'BCG', 'BMI', 'BMP', 'CII', 'CMG', 'CTD', 'CTR', 'DBC', 'DCM',
+    'DGC', 'DGW', 'DHC', 'DIG', 'DPM', 'DXG', 'EIB', 'FTS', 'GEX', 'GMD',
+    'HCM', 'HDC', 'HDG', 'HHV', 'HSG', 'HT1', 'HVN', 'IDC', 'IDI', 'IJC',
+    'KBC', 'KDC', 'KDH', 'KOS', 'LPB', 'MSB', 'NKG', 'NLG', 'NT2', 'NVL',
+    'OCB', 'PAN', 'PC1', 'PDR', 'PHR', 'PNJ', 'PTB', 'PVD', 'PVT', 'REE',
+    'SBT', 'SCS', 'SJS', 'SZC', 'TCH', 'TCM', 'TDC', 'TLG', 'TMS', 'VCA',
+    'VCG', 'VCI', 'VGC', 'VHC', 'VIX', 'VND', 'VPI', 'VSH'
+];
+
+// Top 20 Recommended by Hai
+const TOP20_SYMBOLS = [
+    'FPT', 'VCB', 'MBB', 'ACB', 'TCB', 'HPG', 'PNJ', 'MWG', 'REE', 'DGC',
+    'GMD', 'VHC', 'PTB', 'SZC', 'KBC', 'VNM', 'MSN', 'SAB', 'VHM', 'VIC'
+];
+
 interface StockRealtimeData {
     symbol: string;
     price: number;
@@ -53,11 +71,19 @@ function calculateConsistency(history: any[]): number {
 
 export async function GET(request: NextRequest) {
     try {
+        const url = new Request(request).url;
+        const { searchParams } = new URL(url);
+        const group = searchParams.get('group') || 'vn30';
+
+        let targetSymbols = VN30_SYMBOLS;
+        if (group === 'vn100') targetSymbols = VN100_SYMBOLS;
+        if (group === 'top20') targetSymbols = TOP20_SYMBOLS;
+
         // 1. Fetch Realtime Prices from SSI
         // Using SSI Scoreboard API
         // https://iboard.ssi.com.vn/api/scoreboard/stock-realtime?stockSymbol=ACB,FPT,...
 
-        const symbols = VN30_SYMBOLS.join(',');
+        const symbols = targetSymbols.join(',');
         let realtimeData: any[] = [];
         try {
             const response = await axios.get(`https://iboard.ssi.com.vn/api/scoreboard/stock-realtime`, {
@@ -84,8 +110,8 @@ export async function GET(request: NextRequest) {
             const startTs = endTs - 10 * 24 * 60 * 60; // 10 days back
 
             const BATCH_SIZE = 5;
-            for (let i = 0; i < VN30_SYMBOLS.length; i += BATCH_SIZE) {
-                const batch = VN30_SYMBOLS.slice(i, i + BATCH_SIZE);
+            for (let i = 0; i < targetSymbols.length; i += BATCH_SIZE) {
+                const batch = targetSymbols.slice(i, i + BATCH_SIZE);
                 await Promise.allSettled(batch.map(async (sym) => {
                     try {
                         const hRes = await axios.get('https://dchart-api.vndirect.com.vn/dchart/history', {
@@ -106,15 +132,15 @@ export async function GET(request: NextRequest) {
                     }
                 }));
                 // Tạm nghỉ 300ms giữa các batch để tránh bị Rate Limit (429) từ VNDirect
-                if (i + BATCH_SIZE < VN30_SYMBOLS.length) {
+                if (i + BATCH_SIZE < targetSymbols.length) {
                     await new Promise(r => setTimeout(r, 300));
                 }
             }
-            console.log(`[Screener] DNSE fallback: ${Object.keys(fallbackPrices).length}/${VN30_SYMBOLS.length} stocks`);
+            console.log(`[Screener] DNSE fallback: ${Object.keys(fallbackPrices).length}/${targetSymbols.length} stocks`);
         }
 
         // 2. Process and Enrich Data
-        const enrichedStocks: EnrichedStockData[] = VN30_SYMBOLS.map(symbol => {
+        const enrichedStocks: EnrichedStockData[] = targetSymbols.map(symbol => {
             const quote = realtimeData.find((q: any) => q.stockSymbol === symbol) || {};
             const fb = fallbackPrices[symbol];
 

@@ -23,7 +23,10 @@ import {
     Gift,
     ArrowRight,
     ArrowLeft,
-    PieChart
+    PieChart,
+    Lock,
+    Unlock,
+    X
 } from 'lucide-react';
 import Link from 'next/link';
 import { ScreenerSkeleton } from '@/components/ui/skeleton';
@@ -96,6 +99,14 @@ export default function DividendScreenerPage() {
     const [activeTab, setActiveTab] = useState<'screener' | 'calendar'>('screener');
 
     // === SCREENER STATE === //
+    const [selectedGroup, setSelectedGroup] = useState<'vn30' | 'vn100' | 'top20'>('vn30');
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    const [authUsername, setAuthUsername] = useState('');
+    const [authPassword, setAuthPassword] = useState('');
+    const [authError, setAuthError] = useState('');
+    const [pendingGroup, setPendingGroup] = useState<'vn100' | 'top20' | null>(null);
+
     const [stocks, setStocks] = useState<StockDividendData[]>([]);
     const [sortField, setSortField] = useState<SortField>('dividendYield');
     const [sortAsc, setSortAsc] = useState(false);
@@ -115,7 +126,7 @@ export default function DividendScreenerPage() {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch('/api/stock/screener');
+            const res = await fetch('/api/stock/screener?group=' + selectedGroup);
             const result = await res.json();
 
             if (result.success && result.data && result.data.length > 0) {
@@ -131,13 +142,39 @@ export default function DividendScreenerPage() {
         } finally {
             setLoading(false);
         }
-    }, [activeTab]);
+    }, [activeTab, selectedGroup]);
 
     useEffect(() => {
         if (activeTab === 'screener' && stocks.length === 0) {
             fetchData();
         }
-    }, [activeTab, fetchData, stocks.length]);
+    }, [activeTab, selectedGroup, fetchData, stocks.length]);
+
+    const handleGroupChange = (group: 'vn30' | 'vn100' | 'top20') => {
+        if (group !== 'vn30' && !isAuthenticated) {
+            setPendingGroup(group);
+            setShowAuthModal(true);
+            return;
+        }
+        setStocks([]); // clear old data to trigger loading UI
+        setSelectedGroup(group);
+    };
+
+    const handleLogin = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (authUsername === 'HaiLP' && authPassword === 'DautuTudau') {
+            setIsAuthenticated(true);
+            setShowAuthModal(false);
+            setAuthError('');
+            if (pendingGroup) {
+                setSelectedGroup(pendingGroup);
+                setStocks([]);
+                setPendingGroup(null);
+            }
+        } else {
+            setAuthError('Sai tên đăng nhập hoặc mật khẩu!');
+        }
+    };
 
     const sectors = useMemo(() => {
         if (stocks.length === 0) return ['all'];
@@ -318,6 +355,35 @@ export default function DividendScreenerPage() {
                 ========================================= */}
                 {activeTab === 'screener' && (
                     <div className="space-y-6 animate-in fade-in duration-300">
+                        {/* Group Selection Tabs */}
+                        <GlassCard className="p-2 border-slate-800 backdrop-blur-md">
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant={selectedGroup === 'vn30' ? 'default' : 'ghost'}
+                                    onClick={() => handleGroupChange('vn30')}
+                                    className={selectedGroup === 'vn30' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}
+                                >
+                                    Cơ Bản (VN30)
+                                </Button>
+                                <Button
+                                    variant={selectedGroup === 'vn100' ? 'default' : 'ghost'}
+                                    onClick={() => handleGroupChange('vn100')}
+                                    className={selectedGroup === 'vn100' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}
+                                >
+                                    {isAuthenticated ? <Unlock className="w-4 h-4 mr-2" /> : <Lock className="w-4 h-4 mr-2" />}
+                                    Nâng Cao (VN100)
+                                </Button>
+                                <Button
+                                    variant={selectedGroup === 'top20' ? 'default' : 'ghost'}
+                                    onClick={() => handleGroupChange('top20')}
+                                    className={selectedGroup === 'top20' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800/50 hover:text-emerald-400'}
+                                >
+                                    {isAuthenticated ? <Unlock className="w-4 h-4 mr-2" /> : <Lock className="w-4 h-4 mr-2" />}
+                                    Top 20 Khuyến Nghị
+                                </Button>
+                            </div>
+                        </GlassCard>
+
                         {/* Filters */}
                         <GlassCard className="p-4">
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -737,6 +803,68 @@ export default function DividendScreenerPage() {
                                 Thưởng bằng Cổ phiếu (% tỷ lệ)
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* Auth Modal */}
+                {showAuthModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0f1a]/80 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
+                        <GlassCard className="w-full max-w-md p-6 relative shadow-2xl shadow-indigo-500/10 border-indigo-500/20">
+                            <button
+                                onClick={() => setShowAuthModal(false)}
+                                className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+
+                            <div className="text-center mb-6">
+                                <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mx-auto mb-3">
+                                    <Lock className="w-6 h-6 text-indigo-400" />
+                                </div>
+                                <h2 className="text-xl font-bold text-white mb-2">
+                                    Xác Thực Thành Viên
+                                </h2>
+                                <p className="text-sm text-slate-400">
+                                    Gói Dữ liệu Nâng Cao và Khuyến nghị Chuyên sâu chỉ dành riêng cho khách hàng VIP.
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Tên Đăng Nhập</label>
+                                    <Input
+                                        type="text"
+                                        value={authUsername}
+                                        onChange={(e) => setAuthUsername(e.target.value)}
+                                        className="bg-slate-900/50 border-slate-700/50 text-white h-11 focus-visible:ring-indigo-500/50"
+                                        placeholder="Nhập tên đăng nhập"
+                                        required
+                                        autoComplete="off"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Mật Khẩu</label>
+                                    <Input
+                                        type="password"
+                                        value={authPassword}
+                                        onChange={(e) => setAuthPassword(e.target.value)}
+                                        className="bg-slate-900/50 border-slate-700/50 text-white h-11 focus-visible:ring-indigo-500/50"
+                                        placeholder="Nhập mật khẩu"
+                                        required
+                                    />
+                                </div>
+
+                                {authError && (
+                                    <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
+                                        {authError}
+                                    </div>
+                                )}
+
+                                <Button type="submit" className="w-full h-11 bg-indigo-600 hover:bg-indigo-500 text-white font-bold tracking-wide mt-2">
+                                    <Unlock className="w-4 h-4 mr-2" /> ĐĂNG NHẬP
+                                </Button>
+                            </form>
+                        </GlassCard>
                     </div>
                 )}
             </div>
