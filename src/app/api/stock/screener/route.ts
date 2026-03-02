@@ -21,11 +21,38 @@ const VN100_SYMBOLS = [
     'VCG', 'VCI', 'VGC', 'VHC', 'VIX', 'VND', 'VPI', 'VSH'
 ];
 
-// Top 20 Recommended by Hai
-const TOP20_SYMBOLS = [
-    'FPT', 'VCB', 'MBB', 'ACB', 'TCB', 'HPG', 'PNJ', 'MWG', 'REE', 'DGC',
-    'GMD', 'VHC', 'PTB', 'SZC', 'KBC', 'VNM', 'MSN', 'SAB', 'VHM', 'VIC'
-];
+// Helper: Calculate consistency score (1-5) based on dividend history
+function calculateConsistency(history: any[]): number {
+    if (!history || history.length === 0) return 0;
+    const years = history.length;
+    let score = Math.min(5, years);
+    return score;
+}
+
+// Generate Top 20 dynamically based on dividend consistency and history from dividendsData
+const generateTop20 = () => {
+    const allSymbols = Object.keys(dividendsData);
+    const scoredSymbols = allSymbols.map(sym => {
+        const divInfo = (dividendsData as any)[sym] || [];
+        const consistency = calculateConsistency(divInfo);
+
+        // Sum of all dividends as a tie-breaker
+        const totalDivs = divInfo.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
+
+        return { symbol: sym, consistency, totalDivs };
+    });
+
+    // Sort by consistency (desc), then total dividends (desc)
+    scoredSymbols.sort((a, b) => {
+        if (b.consistency !== a.consistency) return b.consistency - a.consistency;
+        return b.totalDivs - a.totalDivs;
+    });
+
+    return scoredSymbols.slice(0, 20).map(s => s.symbol);
+};
+
+// Top 20 Recommended by Hai (Dynamically Ranked)
+const TOP20_SYMBOLS = generateTop20();
 
 interface StockRealtimeData {
     symbol: string;
@@ -58,15 +85,6 @@ function getSector(symbol: string): string {
         'VIC': 'Bất động sản', 'VRE': 'Bất động sản', 'VJC': 'Hàng không', 'DGC': 'Hóa chất'
     };
     return sectorMap[symbol] || 'Khác';
-}
-
-// Calculate consistency score (1-5) based on dividend history
-function calculateConsistency(history: any[]): number {
-    if (!history || history.length === 0) return 0;
-    const years = history.length;
-    let score = Math.min(5, years);
-    // Reduce if gaps? For now simple count
-    return score;
 }
 
 export async function GET(request: NextRequest) {

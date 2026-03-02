@@ -29,6 +29,7 @@ import {
     X
 } from 'lucide-react';
 import Link from 'next/link';
+import { Logo } from '@/components/ui/Logo';
 import { ScreenerSkeleton } from '@/components/ui/skeleton';
 import dividendsData from '@/data/dividends.json';
 
@@ -299,13 +300,8 @@ export default function DividendScreenerPage() {
 
                 {/* Navigation Header */}
                 <div className="flex items-center justify-between mb-2">
-                    <Link href="/" className="flex items-center gap-2 group">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:shadow-indigo-500/25 transition-all">
-                            <PieChart className="w-5 h-5 text-white" />
-                        </div>
-                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
-                            HẢI TỰ ĐẦU
-                        </span>
+                    <Link href="/" className="block">
+                        <Logo />
                     </Link>
                     <Link href="/">
                         <Button variant="ghost" className="text-slate-400 hover:text-white">
