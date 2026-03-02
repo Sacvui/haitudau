@@ -58,15 +58,19 @@ export async function GET(request: NextRequest) {
         // https://iboard.ssi.com.vn/api/scoreboard/stock-realtime?stockSymbol=ACB,FPT,...
 
         const symbols = VN30_SYMBOLS.join(',');
-        const response = await axios.get(`https://iboard.ssi.com.vn/api/scoreboard/stock-realtime`, {
-            params: { stockSymbol: symbols },
-            headers: {
-                'User-Agent': 'Mozilla/5.0'
-            },
-            timeout: 5000
-        });
-
-        const realtimeData = response.data?.data || [];
+        let realtimeData: any[] = [];
+        try {
+            const response = await axios.get(`https://iboard.ssi.com.vn/api/scoreboard/stock-realtime`, {
+                params: { stockSymbol: symbols },
+                headers: {
+                    'User-Agent': 'Mozilla/5.0'
+                },
+                timeout: 5000
+            });
+            realtimeData = response.data?.data || [];
+        } catch (err: any) {
+            console.warn('[Screener] SSI Realtime API failed, falling back to history:', err.message);
+        }
 
         // Check if all prices are 0 (weekend/off-hours)
         const allZero = realtimeData.every((q: any) => !q.matchedPrice && !q.refPrice);
