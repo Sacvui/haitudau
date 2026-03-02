@@ -27,6 +27,42 @@ interface FundamentalsData {
     historicalReturn5Y: number;// 5 Year Stock return CAGR (%)
 }
 
+const STOCK_METADATA: Record<string, { name: string, industry: string }> = {
+    'ACB': { name: 'Ngân hàng Á Châu', industry: 'Ngân hàng' },
+    'BCM': { name: 'Bình Dương (Becamex)', industry: 'Bất động sản' },
+    'BID': { name: 'BIDV', industry: 'Ngân hàng' },
+    'BVH': { name: 'Bảo hiểm Bảo Việt', industry: 'Bảo hiểm' },
+    'CTG': { name: 'VietinBank', industry: 'Ngân hàng' },
+    'FPT': { name: 'FPT Corp', industry: 'Công nghệ' },
+    'GAS': { name: 'PV GAS', industry: 'Dầu khí' },
+    'GVR': { name: 'Cao su Việt Nam', industry: 'Cao su' },
+    'HDB': { name: 'HDBank', industry: 'Ngân hàng' },
+    'HPG': { name: 'Hòa Phát', industry: 'Thép' },
+    'MBB': { name: 'MBBank', industry: 'Ngân hàng' },
+    'MSN': { name: 'Masan Group', industry: 'Tiêu dùng' },
+    'MWG': { name: 'Thế giới Di động', industry: 'Bán lẻ' },
+    'PLX': { name: 'Petrolimex', industry: 'Dầu khí' },
+    'POW': { name: 'PV Power', industry: 'Điện' },
+    'SAB': { name: 'Sabeco', industry: 'Tiêu dùng' },
+    'SHB': { name: 'SHB', industry: 'Ngân hàng' },
+    'SSB': { name: 'SeABank', industry: 'Ngân hàng' },
+    'SSI': { name: 'Chứng khoán SSI', industry: 'Chứng khoán' },
+    'STB': { name: 'Sacombank', industry: 'Ngân hàng' },
+    'TCB': { name: 'Techcombank', industry: 'Ngân hàng' },
+    'TPB': { name: 'TPBank', industry: 'Ngân hàng' },
+    'VCB': { name: 'Vietcombank', industry: 'Ngân hàng' },
+    'VHM': { name: 'Vinhomes', industry: 'Bất động sản' },
+    'VIB': { name: 'VIBBank', industry: 'Ngân hàng' },
+    'VIC': { name: 'Vingroup', industry: 'Bất động sản' },
+    'VJC': { name: 'Vietjet Air', industry: 'Hàng không' },
+    'VNM': { name: 'Vinamilk', industry: 'Tiêu dùng' },
+    'VPB': { name: 'VPBank', industry: 'Ngân hàng' },
+    'VRE': { name: 'Vincom Retail', industry: 'Bất động sản' },
+    'DGC': { name: 'Hóa chất Đức Giang', industry: 'Hóa chất' },
+    'VCI': { name: 'Chứng khoán Vietcap', industry: 'Chứng khoán' },
+    'VND': { name: 'Chứng khoán VNDIRECT', industry: 'Chứng khoán' },
+};
+
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol')?.toUpperCase();
@@ -42,8 +78,9 @@ export async function GET(request: NextRequest) {
     const toTs = Math.floor(Date.now() / 1000);
     const fromTs = toTs - 7 * 24 * 60 * 60; // 7 days ago
 
-    let companyName = symbol;
-    let industry = 'N/A';
+    const metadata = STOCK_METADATA[symbol] || { name: symbol, industry: 'N/A' };
+    let companyName = metadata.name;
+    let industry = metadata.industry;
     let marketCap = 25000000;
     let industryPE = 15;
     if (symbol === 'FPT') industryPE = 22;
