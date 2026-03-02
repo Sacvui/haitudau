@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /*
  * ===================================
@@ -213,7 +214,7 @@ Trả lời ĐÚNG format JSON:
 KHÔNG viết gì khác ngoài JSON.`;
 
     let text = '';
-    const genAI = new (require('@google/generative-ai').GoogleGenerativeAI)(apiKey);
+    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     let attempts = 0;

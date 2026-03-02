@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-    TrendingUp, TrendingDown, Calendar, Shield, AlertTriangle,
+    Calendar, Shield, AlertTriangle,
     CheckCircle, Loader2, Menu, Newspaper, BarChart3, RefreshCw,
-    ArrowUp, ArrowDown, Minus, Clock, Sparkles
+    Minus, Clock, Sparkles, ArrowUp, ArrowDown
 } from 'lucide-react';
 
 interface DailyReport {
