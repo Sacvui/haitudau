@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import MarketSentimentGauge from '@/components/MarketSentimentGauge';
+import WhaleTracker from '@/components/WhaleTracker';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -258,6 +259,11 @@ export default function ValuationPage() {
                                     <Loader2 className="w-8 h-8 text-indigo-500/30 animate-spin" />
                                 </Card>
                             )}
+                        </div>
+
+                        {/* Whale Tracker */}
+                        <div className="lg:w-80">
+                            <WhaleTracker initialSymbol={symbol || 'VIB'} />
                         </div>
                     </div>
 

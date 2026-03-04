@@ -4,6 +4,7 @@ import { StockHistoryParams, StockDataPoint, DividendInfo } from './types';
 // API endpoints for Vietnamese stock data
 const CAFEF_API = 'https://s.cafef.vn/Ajax/PageNew/DataHistory/PriceHistory.ashx';
 const VNDIRECT_API = 'https://finfo-api.vndirect.com.vn/v4/stock_prices';
+const VNDIRECT_FOREIGN_API = 'https://finfo-api.vndirect.com.vn/v4/foreign_trades';
 
 // Fetch stock history from CafeF
 export async function fetchStockHistory(params: StockHistoryParams): Promise<StockDataPoint[]> {
@@ -35,6 +36,38 @@ export async function fetchStockHistory(params: StockHistoryParams): Promise<Sto
         return [];
     } catch (error) {
         console.error('Error fetching stock history:', error);
+        return [];
+    }
+}
+
+// Fetch foreign trading history
+export async function fetchForeignTrades(symbol: string): Promise<any[]> {
+    try {
+        const response = await axios.get(VNDIRECT_FOREIGN_API, {
+            params: {
+                sort: 'date',
+                q: `code:${symbol}`,
+                size: 30,
+                page: 1,
+            },
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            timeout: 5000
+        });
+
+        if (response.data && response.data.data) {
+            return response.data.data.map((item: any) => ({
+                date: item.date,
+                buyVolume: item.nmBuyVol || 0,
+                sellVolume: item.nmSellVol || 0,
+                buyValue: item.nmBuyVal || 0,
+                sellValue: item.nmSellVal || 0,
+                netVolume: (item.nmBuyVol || 0) - (item.nmSellVol || 0),
+                netValue: (item.nmBuyVal || 0) - (item.nmSellVal || 0),
+            }));
+        }
+        return [];
+    } catch (error) {
+        console.error('Error fetching foreign trades:', error);
         return [];
     }
 }
