@@ -32,23 +32,31 @@ export async function GET(request: Request) {
             let sentiment = 'TRUNG TÍNH';
             let color = 'text-slate-400';
             const isVIB = symbol === 'VIB';
+            const isFPT = symbol === 'FPT';
             let action = 'Cổ phiếu chưa thu hút được dòng tiền lớn. Khuyến nghị quan sát thêm.';
 
             if (recentNetValue > 0 && netValueTotal > 0) {
                 status = 'ACCUMULATING';
                 sentiment = 'DỒN DẬP GOM HÀNG';
                 color = 'text-emerald-400';
-                action = isVIB ? 'Cá mập đang bảo vệ vùng giá 16.5-17.0. Rất thích hợp để gia tăng tỷ trọng cho mục tiêu dài hạn 2x.' : 'Tiếp tục nắm giữ hoặc canh mua thêm tại các nhịp điều chỉnh đỏ.';
+
+                if (isVIB) {
+                    action = 'Cá mập đang bảo vệ vùng giá 16.5-17.0. Rất thích hợp để gia tăng tỷ trọng cho mục tiêu dài hạn 2x.';
+                } else if (isFPT) {
+                    action = 'Về kỹ thuật: Cá mập đang gom hàng mạnh. Tuy nhiên về định giá: FPT đang ở vùng giá cao (Overvalued). KHÔNG nên mua đuổi, chỉ nên canh giải ngân khi có nhịp điều chỉnh về vùng 8x-9x.';
+                } else {
+                    action = 'Dòng tiền cá mập đang vào mạnh. Tuy nhiên hãy kiểm tra tab "Định giá" để đảm bảo biên an toàn > 15% trước khi giải ngân.';
+                }
             } else if (recentNetValue < 0 && netValueTotal < 0) {
                 status = 'DISTRIBUTING';
                 sentiment = 'DẤU HIỆU XẢ HÀNG';
                 color = 'text-rose-400';
-                action = 'Hạn chế mua mới. Nên hạ bớt tỷ trọng nếu đang sử dụng margin cao, chờ cổ phiếu thiết lập vùng cân bằng mới.';
+                action = 'Cá mập đang thoát hàng. Hạn chế mua mới, nên hạ bớt tỷ trọng nếu đang sử dụng margin cao.';
             } else if (recentNetValue > 0) {
                 status = 'HUNTING';
                 sentiment = 'BẮT ĐẦU QUAN TÂM';
                 color = 'text-indigo-400';
-                action = 'Dòng tiền có dấu hiệu quay lại sau chuỗi ngày ảm đạm. Có thể mở vị thế thăm dò 10-20% tài khoản.';
+                action = 'Dòng tiền có dấu hiệu quay lại. Có thể mở vị thế thăm dò 10-20% tài khoản nếu định giá còn rẻ.';
             }
 
             return {

@@ -263,7 +263,7 @@ export default function ValuationPage() {
 
                         {/* Whale Tracker */}
                         <div className="lg:w-80">
-                            <WhaleTracker initialSymbol={symbol || 'VIB'} />
+                            <WhaleTracker key={fundamentals?.symbol || symbol} initialSymbol={fundamentals?.symbol || symbol || 'VIB'} />
                         </div>
                     </div>
 

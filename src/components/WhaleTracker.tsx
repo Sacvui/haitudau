@@ -79,26 +79,6 @@ export default function WhaleTracker({ initialSymbol = 'VIB' }: { initialSymbol?
                         </CardDescription>
                     </div>
 
-                    <form onSubmit={handleSearch} className="relative flex items-center gap-2">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder="Mã cổ phiếu..."
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                className="w-full md:w-32 bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-1.5 pl-9 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
-                            />
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => fetchWhaleData(symbol)}
-                            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-500 hover:text-white transition-colors"
-                            title="Làm mới dữ liệu"
-                        >
-                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
-                        </button>
-                    </form>
                 </div>
             </CardHeader>
 
