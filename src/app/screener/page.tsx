@@ -40,6 +40,7 @@ interface StockDividendData {
     currentPrice: number;
     changePercent: number; // For short term rec
     volume: number;        // For short term rec
+    volumeRatio: number;   // For Smart Money signal
     dividendPerShare: number;
     dividendYield: number;
     dividendHistory: { year: number; dividend: number; yield: number }[];
@@ -58,7 +59,7 @@ interface DividendEvent {
     description: string;
 }
 
-type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol' | 'shortTermRec' | 'longTermRec';
+type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol' | 'shortTermRec' | 'longTermRec' | 'volumeRatio';
 
 // Recommendations Scoring Helpers (for sorting)
 const getShortTermScore = (stock: StockDividendData) => {
@@ -243,6 +244,28 @@ export default function DividendScreenerPage() {
         if (stock.consistencyScore >= 4 && stock.dividendYield >= 5) return { label: 'MUA', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' };
         if (stock.consistencyScore >= 3 || stock.dividendYield >= 3) return { label: 'NẮM GIỮ', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' };
         return { label: 'ĐỨNG NGOÀI', color: 'text-slate-400 bg-slate-500/10 border-slate-500/30' };
+    };
+
+    const getSmartFlowSignal = (stock: StockDividendData) => {
+        if (!stock.volumeRatio) return { label: 'Tích Lũy', color: 'text-slate-400 bg-slate-500/10 border-slate-500/30', icon: '➖' };
+
+        if (stock.volumeRatio > 1.5) {
+            if (stock.changePercent > 0) {
+                return { label: 'Cá Mập Gom', color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/50', icon: '🐋' };
+            } else if (stock.changePercent < 0) {
+                return { label: 'Xả Hàng', color: 'text-rose-400 bg-rose-500/20 border-rose-500/50', icon: '⚠️' };
+            }
+        }
+
+        if (stock.volumeRatio > 1.2) {
+            if (stock.changePercent > 0) {
+                return { label: 'Dòng Tiền Vào', color: 'text-indigo-400 bg-indigo-500/20 border-indigo-500/50', icon: '🌊' };
+            } else if (stock.changePercent < 0) {
+                return { label: 'Cung Tăng', color: 'text-amber-400 bg-amber-500/20 border-amber-500/50', icon: '📉' };
+            }
+        }
+
+        return { label: 'Tích Lũy', color: 'text-slate-400 bg-slate-500/10 border-slate-500/30', icon: '➖' };
     };
 
     const stats = useMemo(() => {
@@ -514,6 +537,14 @@ export default function DividendScreenerPage() {
                                                 <th className="p-3 text-right text-xs font-bold text-slate-400 uppercase">Giá</th>
                                                 <th
                                                     className="p-3 text-right text-xs font-bold text-slate-400 uppercase cursor-pointer hover:text-white transition-colors"
+                                                    onClick={() => handleSort('volumeRatio')}
+                                                >
+                                                    <span className="flex items-center justify-end gap-1">
+                                                        Dòng Tiền <ArrowUpDown className={`w-3 h-3 ${sortField === 'volumeRatio' ? 'text-indigo-400' : ''}`} />
+                                                    </span>
+                                                </th>
+                                                <th
+                                                    className="p-3 text-right text-xs font-bold text-slate-400 uppercase cursor-pointer hover:text-white transition-colors"
                                                     onClick={() => handleSort('dividendYield')}
                                                 >
                                                     <span className="flex items-center justify-end gap-1">
@@ -557,10 +588,10 @@ export default function DividendScreenerPage() {
                                         </thead>
                                         <tbody className="divide-y divide-white/5">
                                             {loading ? (
-                                                <tr><td colSpan={10}><ScreenerSkeleton /></td></tr>
+                                                <tr><td colSpan={11}><ScreenerSkeleton /></td></tr>
                                             ) : filteredStocks.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={10} className="p-8 text-center text-slate-500">
+                                                    <td colSpan={11} className="p-8 text-center text-slate-500">
                                                         Không tìm thấy cổ phiếu phù hợp với bộ lọc.
                                                     </td>
                                                 </tr>
@@ -580,6 +611,11 @@ export default function DividendScreenerPage() {
                                                         <td className="p-3 text-slate-300 max-w-[200px] truncate">{stock.name}</td>
                                                         <td className="p-3 text-right font-mono text-white">
                                                             {(stock.currentPrice / 1000).toFixed(1)}K
+                                                        </td>
+                                                        <td className="p-3 text-right">
+                                                            <span title={`Khối lượng: ${(stock.volume / 1000).toFixed(0)}K (Tỷ lệ: ${stock.volumeRatio}x)`} className={`inline-flex items-center gap-1 font-bold font-mono px-2 py-1 rounded text-xs border ${getSmartFlowSignal(stock).color}`}>
+                                                                {getSmartFlowSignal(stock).icon} {getSmartFlowSignal(stock).label}
+                                                            </span>
                                                         </td>
                                                         <td className="p-3 text-right">
                                                             <span className={`font-bold font-mono ${stock.dividendYield >= 5 ? 'text-emerald-400' :

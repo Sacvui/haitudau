@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Search, TrendingUp, TrendingDown, Users, Loader2, Info, Landmark, RefreshCw, AlertTriangle, Target } from 'lucide-react';
+import { TrendingUp, Users, Loader2, Info, Landmark, AlertTriangle, Target, Sparkles } from 'lucide-react';
+import { getStoredApiKey } from './ApiKeySettings';
 
 interface WhaleData {
     success: boolean;
@@ -14,29 +15,37 @@ interface WhaleData {
         recentNetValue: number;
         avgDailyNetValue: number;
     };
-    status: 'ACCUMULATING' | 'DISTRIBUTING' | 'HUNTING' | 'NEUTRAL';
+    status: 'ACCUMULATING' | 'DISTRIBUTING' | 'HUNTING' | 'NEUTRAL' | 'EXITING';
     sentiment: string;
     color: string;
     action: string;
+    aiInsight?: string;
     history: any[];
 }
 
-export default function WhaleTracker({ initialSymbol = 'VIB' }: { initialSymbol?: string }) {
+export default function WhaleTracker({ initialSymbol = 'VIB', valuationVerdict }: { initialSymbol?: string; valuationVerdict?: string }) {
     const [symbol, setSymbol] = useState(initialSymbol);
-    const [searchInput, setSearchInput] = useState('');
     const [data, setData] = useState<WhaleData | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchWhaleData(symbol);
-    }, [symbol]);
+        setSymbol(initialSymbol);
+    }, [initialSymbol]);
 
-    const fetchWhaleData = async (targetSymbol: string) => {
+    useEffect(() => {
+        fetchWhaleData(symbol, valuationVerdict);
+    }, [symbol, valuationVerdict]);
+
+    const fetchWhaleData = async (targetSymbol: string, verdict?: string) => {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`/api/stock/whale-tracker?symbol=${targetSymbol}`);
+            const url = `/api/stock/whale-tracker?symbol=${targetSymbol}${verdict ? `&verdict=${verdict}` : ''}`;
+            const userKey = getStoredApiKey();
+            const headers: Record<string, string> = {};
+            if (userKey) headers['x-gemini-key'] = userKey;
+            const res = await fetch(url, { headers });
             const result = await res.json();
             if (result.success) {
                 setData(result);
@@ -47,13 +56,6 @@ export default function WhaleTracker({ initialSymbol = 'VIB' }: { initialSymbol?
             setError('Lỗi kết nối máy chủ.');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (searchInput.trim()) {
-            setSymbol(searchInput.toUpperCase());
         }
     };
 
@@ -78,7 +80,6 @@ export default function WhaleTracker({ initialSymbol = 'VIB' }: { initialSymbol?
                             Theo dõi dòng tiền Khối ngoại & Tự doanh
                         </CardDescription>
                     </div>
-
                 </div>
             </CardHeader>
 
@@ -151,6 +152,24 @@ export default function WhaleTracker({ initialSymbol = 'VIB' }: { initialSymbol?
                             </div>
                         </div>
 
+                        {/* AI Strategic Insight */}
+                        {data.aiInsight && (
+                            <div className="relative group/ai">
+                                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl blur opacity-10 group-hover/ai:opacity-25 transition duration-1000"></div>
+                                <div className="relative bg-[#1a1f2e] border border-indigo-500/20 p-4 rounded-xl shadow-xl">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="bg-indigo-500/20 p-1 rounded-md">
+                                            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                                        </div>
+                                        <h4 className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.2em]">Chiến lược Cá mập (AI)</h4>
+                                    </div>
+                                    <p className="text-[13px] text-indigo-100 leading-relaxed font-medium italic">
+                                        "{data.aiInsight}"
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Actionable Advice */}
                         <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 p-4 rounded-xl flex gap-3 items-start shadow-inner">
                             <Target className="w-6 h-6 text-indigo-400 shrink-0 mt-0.5" />
@@ -173,7 +192,7 @@ export default function WhaleTracker({ initialSymbol = 'VIB' }: { initialSymbol?
                                 <span className="text-[10px] text-slate-600">(5 phiên gần nhất)</span>
                             </div>
                             <div className="space-y-1">
-                                {data.history.slice(0, 5).map((day, idx) => (
+                                {data.history && data.history.slice(0, 5).map((day, idx) => (
                                     <div key={idx} className="flex items-center justify-between text-[11px] p-2 hover:bg-slate-800/30 rounded-lg transition-colors border-b border-slate-800/30 last:border-0">
                                         <span className="text-slate-500 font-medium">{day.date}</span>
                                         <div className="flex items-center gap-3">

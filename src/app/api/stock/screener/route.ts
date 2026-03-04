@@ -60,6 +60,7 @@ interface StockRealtimeData {
     change: number;
     changePercent: number;
     volume: number;
+    volumeRatio?: number; // Current volume / Avg 10d volume
     marketCap: number; // Estimated
 }
 
@@ -136,13 +137,13 @@ export async function GET(request: NextRequest) {
 
         // Fallback: fetch last trading day prices from DNSE (VNDirect) when real-time is empty
         // DNSE works 24/7 including weekends, unlike SSI which blocks on Sat/Sun
-        let fallbackPrices: Record<string, { close: number; prevClose: number; volume: number }> = {};
+        let fallbackPrices: Record<string, { close: number; prevClose: number; volume: number; avgVolume10d: number }> = {};
         const allZero = realtimeData.length > 0 && realtimeData.every((q: any) => !q.matchedPrice && !q.refPrice);
 
         if (allZero || realtimeData.length === 0) {
             console.log('[Screener] Real-time prices are all 0 (off-hours). Fetching DNSE fallback...');
             const endTs = Math.floor(Date.now() / 1000);
-            const startTs = endTs - 10 * 24 * 60 * 60; // 10 days back
+            const startTs = endTs - 20 * 24 * 60 * 60; // 20 days back to get enough data for 10d avg
 
             // CRITICAL FIX: Limit fallback requests to max 30 symbols to prevent Vercel 10s timeout
             const fallbackTargets = targetSymbols.slice(0, 30);
@@ -159,10 +160,19 @@ export async function GET(request: NextRequest) {
                         const hd = await hRes.json();
                         if (hd.s === 'ok' && hd.c && hd.c.length >= 2) {
                             const lastIdx = hd.c.length - 1;
+
+                            // Calculate 10d avg volume
+                            const volData = hd.v || [];
+                            const recentVols = volData.slice(Math.max(0, lastIdx - 10), lastIdx);
+                            const avgVol10d = recentVols.length > 0
+                                ? recentVols.reduce((a: number, b: number) => Number(a) + Number(b), 0) / recentVols.length
+                                : Number(volData[lastIdx]);
+
                             fallbackPrices[sym] = {
                                 close: Number(hd.c[lastIdx]) * 1000,
                                 prevClose: Number(hd.c[lastIdx - 1]) * 1000,
-                                volume: Number(hd.v[lastIdx])
+                                volume: Number(hd.v[lastIdx]),
+                                avgVolume10d: avgVol10d
                             };
                         }
                     } catch (e: any) {
@@ -187,6 +197,12 @@ export async function GET(request: NextRequest) {
             const change = (quote.priceChange || 0) || (fb ? fb.close - fb.prevClose : 0);
             const changePercent = (quote.priceChangePercent || 0) || (fb && fb.prevClose > 0 ? parseFloat(((fb.close - fb.prevClose) / fb.prevClose * 100).toFixed(2)) : 0);
             const volume = (quote.totalVolume || 0) || (fb?.volume || 0);
+
+            // For realtime data, SSI scoreboard gives totalVolume but not avgVolume easily, 
+            // but we can use DNSE fallback's avgVolume if we have it, or simulate it for now.
+            // Ideally we fetch a quick history bulk for the whole screaming list
+            let avgVol = fb?.avgVolume10d || volume;
+            const volumeRatio = avgVol > 0 ? parseFloat((volume / avgVol).toFixed(2)) : 1;
 
             // Get Dividend Info safely
             const divInfoRaw = (dividendsData as any)[symbol];
@@ -225,6 +241,7 @@ export async function GET(request: NextRequest) {
                 change,
                 changePercent,
                 volume,
+                volumeRatio,
                 dividendYield: parseFloat(dividendYield.toFixed(2)),
                 dividendPerShare,
                 dividendHistory: [],
@@ -244,6 +261,7 @@ export async function GET(request: NextRequest) {
             change: Number(stock.change || 0),
             changePercent: Number(stock.changePercent || 0),
             volume: Number(stock.volume || 0),
+            volumeRatio: Number(stock.volumeRatio || 1),
             dividendYield: Number(stock.dividendYield || 0),
             dividendPerShare: Number(stock.dividendPerShare || 0),
             dividendHistory: Array.isArray(stock.dividendHistory) ? stock.dividendHistory : [],

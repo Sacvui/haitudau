@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import MarketSentimentGauge from '@/components/MarketSentimentGauge';
 import WhaleTracker from '@/components/WhaleTracker';
+import ApiKeySettings from '@/components/ApiKeySettings';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -262,8 +263,15 @@ export default function ValuationPage() {
                         </div>
 
                         {/* Whale Tracker */}
-                        <div className="lg:w-80">
-                            <WhaleTracker key={fundamentals?.symbol || symbol} initialSymbol={fundamentals?.symbol || symbol || 'VIB'} />
+                        <div className="lg:w-80 space-y-3">
+                            <div className="flex justify-end">
+                                <ApiKeySettings />
+                            </div>
+                            <WhaleTracker
+                                key={fundamentals?.symbol || symbol}
+                                initialSymbol={fundamentals?.symbol || symbol || 'VIB'}
+                                valuationVerdict={valuation?.overallVerdict}
+                            />
                         </div>
                     </div>
 
