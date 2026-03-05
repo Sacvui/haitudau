@@ -98,15 +98,30 @@ Yêu cầu: Viết 1 nhận định CHIẾN LƯỢC cực ngắn (tối đa 2 c�
 Tập trung vào Whale nếu có, hoặc tập trung vào VSA (Vol/Price) nếu không có dữ liệu Whale. 
 Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
 
-                    const genAI = new GoogleGenerativeAI(apiKey);
-                    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-                    const result = await model.generateContent(prompt);
-                    aiInsight = result.response.text().trim();
+                    const genAI = new GoogleGenerativeAI(apiKey.trim());
+                    // Try flash first, then pro as fallback if flash is restricted
+                    const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-pro'];
+                    let lastError = '';
+
+                    for (const modelName of modelsToTry) {
+                        try {
+                            const model = genAI.getGenerativeModel({ model: modelName });
+                            const result = await model.generateContent(prompt);
+                            aiInsight = result.response.text().trim();
+                            if (aiInsight) break; // Success!
+                        } catch (err: any) {
+                            lastError = err.message;
+                            console.warn(`[WhaleTracker] Model ${modelName} failed:`, err.message);
+                            continue;
+                        }
+                    }
+
+                    if (!aiInsight) {
+                        throw new Error(lastError || 'All models failed');
+                    }
                 } catch (aiErr: any) {
                     console.error('AI Insight Error:', aiErr.message);
-                    aiInsight = `Lỗi kết nối AI: ${aiErr.message}`;
-                    // Diagnostic info for developer
-                    console.log(`[WhaleTracker] Diagnostic: Key used: ${apiKey?.substring(0, 6)}...${apiKey?.substring(apiKey.length - 4)}. Error: ${aiErr.message}`);
+                    aiInsight = `Lỗi kết nối AI (403/Expired): Vui lòng kiểm tra lại Key hoặc bật 'Generative Language API' trong AI Studio. Chi tiết: ${aiErr.message}`;
                 }
             } else {
                 aiInsight = 'Vui lòng cấu hình API Key để kích hoạt Chiến lược Cá mập (AI).';
