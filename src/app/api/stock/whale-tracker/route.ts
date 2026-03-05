@@ -40,54 +40,43 @@ export async function GET(request: Request) {
                 console.warn(`[WhaleTracker] Failed to fetch history for ${symbol}:`, e);
             }
 
-            if (!trades || trades.length === 0) {
-                // If we have no real trade data, we return a technical-only response instead of throwing
-                return {
-                    success: true,
-                    symbol,
-                    metrics: { netValueTotal: 0, buyValueTotal: 0, sellValueTotal: 0, recentNetValue: 0, avgDailyNetValue: 0 },
-                    status: 'NEUTRAL',
-                    sentiment: 'ĐANG THEO DÕI',
-                    color: 'text-slate-400',
-                    action: 'Dữ liệu giao dịch khối ngoại tạm thời bị gián đoạn từ nguồn cấp. Vui lòng quay lại sau.',
-                    aiInsight: 'Dữ liệu hiện tại không đủ để AI thực hiện phân tích. Vui lòng cấu hình lại API Key hoặc đổi mã.',
-                    isLive: false,
-                    history: []
-                };
-            }
+            // Allow logic to continue even if trades are empty to give AI a chance to analyze price action
+            const hasTrades = trades && trades.length > 0;
 
             // Calculate summary metrics
-            const netValueTotal = trades.reduce((acc, t) => acc + (Number(t.netValue) || 0), 0);
-            const buyValueTotal = trades.reduce((acc, t) => acc + (Number(t.buyValue) || 0), 0);
-            const sellValueTotal = trades.reduce((acc, t) => acc + (Number(t.sellValue) || 0), 0);
+            const netValueTotal = hasTrades ? trades.reduce((acc, t) => acc + (Number(t.netValue) || 0), 0) : 0;
+            const buyValueTotal = hasTrades ? trades.reduce((acc, t) => acc + (Number(t.buyValue) || 0), 0) : 0;
+            const sellValueTotal = hasTrades ? trades.reduce((acc, t) => acc + (Number(t.sellValue) || 0), 0) : 0;
 
             // Calculate recent momentum (last 5 days vs 30 days)
-            const recentTrades = trades.slice(0, 5);
-            const recentNetValue = recentTrades.reduce((acc, t) => acc + (Number(t.netValue) || 0), 0);
+            const recentTrades = hasTrades ? trades.slice(0, 5) : [];
+            const recentNetValue = hasTrades ? recentTrades.reduce((acc, t) => acc + (Number(t.netValue) || 0), 0) : 0;
 
             let status = 'NEUTRAL';
-            let sentiment = 'TRUNG TÍNH';
+            let sentiment = hasTrades ? 'TRUNG TÍNH' : 'THEO DÕI GIÁ';
             let color = 'text-slate-400';
             const isVIB = symbol === 'VIB';
-            let action = 'Cổ phiếu chưa thu hút được dòng tiền lớn. Khuyến nghị quan sát thêm.';
+            let action = hasTrades ? 'Cổ phiếu chưa thu hút được dòng tiền lớn. Khuyến nghị quan sát thêm.' : 'Dữ liệu Whale tạm ngắt. Hệ thống AI đang chuyển sang phân tích hành vi giá (VSA).';
 
-            // Flow Classification
-            if (recentNetValue > 0 && netValueTotal > 0) {
-                status = 'ACCUMULATING';
-                sentiment = 'DỒN DẬP GOM HÀNG';
-                color = 'text-emerald-400';
-            } else if (recentNetValue < 0 && netValueTotal < 0) {
-                status = 'DISTRIBUTING';
-                sentiment = 'DẤU HIỆU XẢ HÀNG';
-                color = 'text-rose-400';
-            } else if (recentNetValue > 0) {
-                status = 'HUNTING';
-                sentiment = 'BẮT ĐẦU QUAN TÂM';
-                color = 'text-indigo-400';
-            } else if (recentNetValue < 0) {
-                status = 'EXITING';
-                sentiment = 'RỤC RỊCH THOÁT HÀNG';
-                color = 'text-orange-400';
+            // Flow Classification (only if trades exist)
+            if (hasTrades) {
+                if (recentNetValue > 0 && netValueTotal > 0) {
+                    status = 'ACCUMULATING';
+                    sentiment = 'DỒN DẬP GOM HÀNG';
+                    color = 'text-emerald-400';
+                } else if (recentNetValue < 0 && netValueTotal < 0) {
+                    status = 'DISTRIBUTING';
+                    sentiment = 'DẤU HIỆU XẢ HÀNG';
+                    color = 'text-rose-400';
+                } else if (recentNetValue > 0) {
+                    status = 'HUNTING';
+                    sentiment = 'BẮT ĐẦU QUAN TÂM';
+                    color = 'text-indigo-400';
+                } else if (recentNetValue < 0) {
+                    status = 'EXITING';
+                    sentiment = 'RỤC RỊCH THOÁT HÀNG';
+                    color = 'text-orange-400';
+                }
             }
 
             // AI Insight Generation
@@ -96,16 +85,18 @@ export async function GET(request: Request) {
             if (apiKey) {
                 try {
                     const recentPrices = priceHistory.slice(0, 10).map(h => `${h.date}: ${Number(h.close).toLocaleString()}đ (Vol: ${(Number(h.volume) / 1000).toFixed(0)}K)`).join('\n');
-                    const recentWhales = trades.slice(0, 10).map(t => `${t.date}: Net ${(Number(t.netValue) / 1000000).toFixed(1)}M`).join('\n');
+                    const recentWhales = hasTrades ? trades.slice(0, 10).map(t => `${t.date}: Net ${(Number(t.netValue) / 1000000).toFixed(1)}M`).join('\n') : "Dữ liệu Whale hiện tại đang lỗi kết nối.";
 
-                    const prompt = `Bạn là chuyên gia phân tích dòng tiền Cá mập. Phân tích mã ${symbol}:
+                    const prompt = `Bạn là chuyên gia phân tích dòng tiền chuyên nghiệp. Phân tích mã ${symbol}:
 Định giá hiện tại: ${verdict || 'Chưa xác định'}
 Diễn biến giá/vol 10 ngày:
-${recentPrices || 'Dữ liệu giá hiện tại không khả dụng'}
+${recentPrices || 'Dữ liệu giá không khả dụng'}
 Dòng tiền ngoại 10 ngày:
 ${recentWhales}
 
-Yêu cầu: Viết 1 nhận định CHIẾN LƯỢC cực ngắn (tối đa 2 câu, khoảng 40 từ). Tập trung vào sự tương quan giữa Giá và Dòng tiền. Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
+Yêu cầu: Viết 1 nhận định CHIẾN LƯỢC cực ngắn (tối đa 2 câu, khoảng 40 từ). 
+Tập trung vào Whale nếu có, hoặc tập trung vào VSA (Vol/Price) nếu không có dữ liệu Whale. 
+Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
 
                     const genAI = new GoogleGenerativeAI(apiKey);
                     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
@@ -156,15 +147,15 @@ Yêu cầu: Viết 1 nhận định CHIẾN LƯỢC cực ngắn (tối đa 2 c�
                     buyValueTotal,
                     sellValueTotal,
                     recentNetValue,
-                    avgDailyNetValue: netValueTotal / (trades.length || 1)
+                    avgDailyNetValue: netValueTotal / (hasTrades ? (trades.length || 1) : 1)
                 },
                 status,
                 sentiment,
                 color,
                 action,
                 aiInsight,
-                isLive: true,
-                history: trades.slice(0, 10)
+                isLive: hasTrades,
+                history: hasTrades ? trades.slice(0, 10) : []
             };
         }, 15 * 60 * 1000); // 15 minutes cache for AI enhanced results
 
