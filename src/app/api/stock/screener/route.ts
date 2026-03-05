@@ -272,9 +272,40 @@ export async function GET(request: NextRequest) {
             stockDividendRatio: Number(stock.stockDividendRatio || 0)
         }));
 
+        // Calculate Sector Stats
+        const sectorMap = new Map<string, any>();
+        finalData.forEach(stock => {
+            const sector = stock.sector;
+            if (!sectorMap.has(sector)) {
+                sectorMap.set(sector, { sector, totalVolume: 0, averageChange: 0, advancing: 0, declining: 0, averageVolumeRatio: 0, count: 0 });
+            }
+            const stat = sectorMap.get(sector)!;
+            stat.totalVolume += stock.volume;
+            stat.averageChange += stock.changePercent;
+            stat.averageVolumeRatio += stock.volumeRatio;
+            stat.count += 1;
+            if (stock.changePercent > 0) stat.advancing += 1;
+            else if (stock.changePercent < 0) stat.declining += 1;
+        });
+
+        const sectorStats = Array.from(sectorMap.values()).map(stat => ({
+            sector: stat.sector,
+            totalVolume: stat.totalVolume,
+            averageChange: parseFloat((stat.averageChange / stat.count).toFixed(2)),
+            advancing: stat.advancing,
+            declining: stat.declining,
+            averageVolumeRatio: parseFloat((stat.averageVolumeRatio / stat.count).toFixed(2)),
+            count: stat.count
+        })).sort((a, b) => {
+            // Sort by average volume ratio first (highest interest)
+            if (b.averageVolumeRatio !== a.averageVolumeRatio) return b.averageVolumeRatio - a.averageVolumeRatio;
+            return b.averageChange - a.averageChange;
+        });
+
         return NextResponse.json({
             success: true,
-            data: finalData
+            data: finalData,
+            sectorStats
         });
 
     } catch (err: any) {

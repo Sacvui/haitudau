@@ -19,29 +19,51 @@ export async function GET(request: Request) {
         const hasUserKey = !!userGeminiKey;
         const cacheKey = `whale_tracker_v2_${symbol}_${verdict || 'NONE'}${hasUserKey ? '_user' : ''}`;
         const trackerData = await getWithCache(cacheKey, async () => {
-            const trades = await fetchForeignTrades(symbol);
-
-            if (!trades || trades.length === 0) {
-                throw new Error(`No data found for ${symbol}`);
+            let trades: any[] = [];
+            try {
+                trades = await fetchForeignTrades(symbol);
+            } catch (e) {
+                console.warn(`[WhaleTracker] Failed to fetch trades for ${symbol}:`, e);
             }
 
             // Fetch price history for context
-            const now = new Date();
-            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            const priceHistory = await fetchStockHistory({
-                symbol,
-                startDate: thirtyDaysAgo.toLocaleDateString('vi-VN'),
-                endDate: now.toLocaleDateString('vi-VN')
-            });
+            let priceHistory: any[] = [];
+            try {
+                const now = new Date();
+                const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                priceHistory = await fetchStockHistory({
+                    symbol,
+                    startDate: thirtyDaysAgo.toLocaleDateString('vi-VN'),
+                    endDate: now.toLocaleDateString('vi-VN')
+                });
+            } catch (e) {
+                console.warn(`[WhaleTracker] Failed to fetch history for ${symbol}:`, e);
+            }
+
+            if (!trades || trades.length === 0) {
+                // If we have no real trade data, we return a technical-only response instead of throwing
+                return {
+                    success: true,
+                    symbol,
+                    metrics: { netValueTotal: 0, buyValueTotal: 0, sellValueTotal: 0, recentNetValue: 0, avgDailyNetValue: 0 },
+                    status: 'NEUTRAL',
+                    sentiment: 'ĐANG THEO DÕI',
+                    color: 'text-slate-400',
+                    action: 'Dữ liệu giao dịch khối ngoại tạm thời bị gián đoạn từ nguồn cấp. Vui lòng quay lại sau.',
+                    aiInsight: 'Dữ liệu hiện tại không đủ để AI thực hiện phân tích. Vui lòng cấu hình lại API Key hoặc đổi mã.',
+                    isLive: false,
+                    history: []
+                };
+            }
 
             // Calculate summary metrics
-            const netValueTotal = trades.reduce((acc, t) => acc + t.netValue, 0);
-            const buyValueTotal = trades.reduce((acc, t) => acc + t.buyValue, 0);
-            const sellValueTotal = trades.reduce((acc, t) => acc + t.sellValue, 0);
+            const netValueTotal = trades.reduce((acc, t) => acc + (Number(t.netValue) || 0), 0);
+            const buyValueTotal = trades.reduce((acc, t) => acc + (Number(t.buyValue) || 0), 0);
+            const sellValueTotal = trades.reduce((acc, t) => acc + (Number(t.sellValue) || 0), 0);
 
             // Calculate recent momentum (last 5 days vs 30 days)
             const recentTrades = trades.slice(0, 5);
-            const recentNetValue = recentTrades.reduce((acc, t) => acc + t.netValue, 0);
+            const recentNetValue = recentTrades.reduce((acc, t) => acc + (Number(t.netValue) || 0), 0);
 
             let status = 'NEUTRAL';
             let sentiment = 'TRUNG TÍNH';
@@ -73,26 +95,28 @@ export async function GET(request: Request) {
             const apiKey = userGeminiKey || process.env.GEMINI_API_KEY;
             if (apiKey) {
                 try {
-                    const recentPrices = priceHistory.slice(0, 10).map(h => `${h.date}: ${h.close.toLocaleString()}đ (Vol: ${(h.volume / 1000).toFixed(0)}K)`).join('\n');
-                    const recentWhales = trades.slice(0, 10).map(t => `${t.date}: Net ${(t.netValue / 1000000).toFixed(1)}M`).join('\n');
+                    const recentPrices = priceHistory.slice(0, 10).map(h => `${h.date}: ${Number(h.close).toLocaleString()}đ (Vol: ${(Number(h.volume) / 1000).toFixed(0)}K)`).join('\n');
+                    const recentWhales = trades.slice(0, 10).map(t => `${t.date}: Net ${(Number(t.netValue) / 1000000).toFixed(1)}M`).join('\n');
 
                     const prompt = `Bạn là chuyên gia phân tích dòng tiền Cá mập. Phân tích mã ${symbol}:
 Định giá hiện tại: ${verdict || 'Chưa xác định'}
 Diễn biến giá/vol 10 ngày:
-${recentPrices}
+${recentPrices || 'Dữ liệu giá hiện tại không khả dụng'}
 Dòng tiền ngoại 10 ngày:
 ${recentWhales}
 
-Yêu cầu: Viết 1 nhận định CHIẾN LƯỢC cực ngắn (tối đa 2 câu, khoảng 40 từ). Tập trung vào sự tương quan giữa Giá và Dòng tiền (ví dụ: đè gom, kéo xả, hay cạn cung). Trả lời trực tiếp bằng tiếng Việt, không chào hỏi.`;
+Yêu cầu: Viết 1 nhận định CHIẾN LƯỢC cực ngắn (tối đa 2 câu, khoảng 40 từ). Tập trung vào sự tương quan giữa Giá và Dòng tiền. Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
 
                     const genAI = new GoogleGenerativeAI(apiKey);
                     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
                     const result = await model.generateContent(prompt);
                     aiInsight = result.response.text().trim();
-                } catch (aiErr) {
-                    console.error('AI Insight Error:', aiErr);
-                    aiInsight = 'Hệ thống AI đang bận phân tích tương quan. Vui lòng quay lại sau.';
+                } catch (aiErr: any) {
+                    console.error('AI Insight Error:', aiErr.message);
+                    aiInsight = 'Kết nối máy chủ AI gặp gián đoạn. Đang hiển thị phân tích kỹ thuật hệ thống.';
                 }
+            } else {
+                aiInsight = 'Vui lòng cấu hình API Key để kích hoạt Chiến lược Cá mập (AI).';
             }
 
             // Comprehensive Recommendation Matrix
@@ -132,7 +156,7 @@ Yêu cầu: Viết 1 nhận định CHIẾN LƯỢC cực ngắn (tối đa 2 c�
                     buyValueTotal,
                     sellValueTotal,
                     recentNetValue,
-                    avgDailyNetValue: netValueTotal / trades.length
+                    avgDailyNetValue: netValueTotal / (trades.length || 1)
                 },
                 status,
                 sentiment,
@@ -146,42 +170,25 @@ Yêu cầu: Viết 1 nhận định CHIẾN LƯỢC cực ngắn (tối đa 2 c�
 
         return NextResponse.json(trackerData);
     } catch (error: any) {
-        console.error('Whale Tracker API Error:', error.message);
-
-        // Fallback data for VIB or others if API fails
-        const isVIB = symbol.toUpperCase() === 'VIB';
-        const fallbackNet = isVIB ? 45000000000 : 5000000000;
-
-        let fallbackAction = isVIB
-            ? 'Cá mập đang bảo vệ vùng giá 16.5-17.0. Có game thoái vốn CBA và IPO Kafi, rất thích hợp gia tăng tỷ trọng.'
-            : 'Vận động dòng tiền ổn định. Tuy nhiên cần đối chiếu thêm với tab Định giá để ra quyết định an toàn nhất.';
-
-        if (verdict === 'EXPENSIVE') {
-            fallbackAction = `Thận trọng. Mặc dù dòng tiền ổn định nhưng ${symbol} đang ở vùng định giá đắt. Ưu tiên quan sát nhịp chỉnh.`;
-        }
+        console.error('Whale Tracker API Global Error:', error.message);
 
         return NextResponse.json({
             success: true,
             symbol: symbol.toUpperCase(),
             metrics: {
-                netValueTotal: fallbackNet,
-                buyValueTotal: Math.abs(fallbackNet) * 2,
-                sellValueTotal: Math.abs(fallbackNet),
-                recentNetValue: fallbackNet / 6,
-                avgDailyNetValue: fallbackNet / 30
+                netValueTotal: 0,
+                buyValueTotal: 0,
+                sellValueTotal: 0,
+                recentNetValue: 0,
+                avgDailyNetValue: 0
             },
-            status: 'ACCUMULATING',
-            sentiment: isVIB ? 'DỒN DẬP GOM HÀNG (SIM)' : 'ĐANG THEO DÕI (SIM)',
-            color: isVIB ? 'text-emerald-400' : 'text-slate-400',
-            action: fallbackAction,
-            aiInsight: 'Kết nối máy chủ AI thất bại. Đang hiển thị dữ liệu kỹ thuật thuần bản.',
+            status: 'NEUTRAL',
+            sentiment: 'DỮ LIỆU TẠM NGẮT',
+            color: 'text-slate-400',
+            action: 'Hệ thống dữ liệu tài chính đang quá tải. Vui lòng thử lại sau vài giây.',
+            aiInsight: 'Không thể phân tích do sự cố kết nối dữ liệu nguồn. Vui lòng kiểm tra lại cấu hình API key.',
             isLive: false,
-            message: 'Đang hiển thị dữ liệu mô phỏng do lỗi kết nối máy chủ dữ liệu.',
-            history: Array.from({ length: 10 }).map((_, i) => ({
-                date: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                buyValue: 10000000000 + Math.random() * 5000000000,
-                netValue: 2000000000 + Math.random() * 3000000000
-            }))
+            message: 'Đang hiển thị dữ liệu trống do lỗi kết nối máy chủ dữ liệu.'
         });
     }
 }

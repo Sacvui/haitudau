@@ -59,6 +59,16 @@ interface DividendEvent {
     description: string;
 }
 
+interface SectorStat {
+    sector: string;
+    totalVolume: number;
+    averageChange: number;
+    advancing: number;
+    declining: number;
+    averageVolumeRatio: number;
+    count: number;
+}
+
 type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol' | 'shortTermRec' | 'longTermRec' | 'volumeRatio';
 
 // Recommendations Scoring Helpers (for sorting)
@@ -110,6 +120,7 @@ export default function DividendScreenerPage() {
     const [pendingGroup, setPendingGroup] = useState<'vn100' | 'top20' | null>(null);
 
     const [stocks, setStocks] = useState<StockDividendData[]>([]);
+    const [sectorStats, setSectorStats] = useState<SectorStat[]>([]);
     const [sortField, setSortField] = useState<SortField>('dividendYield');
     const [sortAsc, setSortAsc] = useState(false);
     const [filter, setFilter] = useState({
@@ -133,6 +144,9 @@ export default function DividendScreenerPage() {
 
             if (result.success && result.data && result.data.length > 0) {
                 setStocks(result.data);
+                if (result.sectorStats) {
+                    setSectorStats(result.sectorStats);
+                }
                 setDataSource('realtime');
             } else {
                 throw new Error(result.error || 'Không có dữ liệu từ API');
@@ -402,6 +416,72 @@ export default function DividendScreenerPage() {
                                 </Button>
                             </div>
                         </GlassCard>
+
+                        {/* Sector Heatmap (Sóng Ngành) */}
+                        {sectorStats.length > 0 && selectedGroup !== 'top20' && (
+                            <GlassCard className="p-4 border-slate-800">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <PieChart className="w-5 h-5 text-purple-400" />
+                                    <h2 className="text-sm font-bold text-slate-300 uppercase">Sóng Ngành (Sector Focus)</h2>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                    {sectorStats.map((stat) => {
+                                        // Phân loại trạng thái ngành
+                                        const isLeading = stat.averageVolumeRatio > 1.2 && stat.averageChange > 0.5;
+                                        const isWeakening = stat.averageVolumeRatio > 1.2 && stat.averageChange < -0.5;
+                                        const isRecovering = stat.averageVolumeRatio <= 1.2 && stat.averageChange > 0;
+
+                                        let bgColor = "bg-slate-800/40 border-slate-700 hover:bg-slate-700/50";
+                                        let textColor = "text-slate-300";
+                                        let statusText = "Tích lũy";
+
+                                        if (isLeading) {
+                                            bgColor = "bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20";
+                                            textColor = "text-emerald-400";
+                                            statusText = "Dẫn sóng";
+                                        } else if (isWeakening) {
+                                            bgColor = "bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20";
+                                            textColor = "text-rose-400";
+                                            statusText = "Phân phối";
+                                        } else if (isRecovering) {
+                                            bgColor = "bg-indigo-500/10 border-indigo-500/30 hover:bg-indigo-500/20";
+                                            textColor = "text-indigo-400";
+                                            statusText = "Hồi phục";
+                                        }
+
+                                        return (
+                                            <div
+                                                key={stat.sector}
+                                                className={`p-3 rounded-xl cursor-pointer transition-all border ${bgColor} ${filter.sector === stat.sector ? 'ring-2 ring-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.3)]' : ''}`}
+                                                onClick={() => setFilter(f => ({ ...f, sector: filter.sector === stat.sector ? 'all' : stat.sector }))}
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className={`font-bold text-sm ${textColor} truncate max-w-[80px]`} title={stat.sector}>{stat.sector}</span>
+                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${bgColor.replace('hover:', '')}`}>
+                                                        {statusText}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-end">
+                                                    <div>
+                                                        <p className={`font-mono text-sm font-bold ${stat.averageChange > 0 ? 'text-emerald-400' : stat.averageChange < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                                            {stat.averageChange > 0 ? '+' : ''}{stat.averageChange}%
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-mono text-xs font-bold text-indigo-400">{stat.averageVolumeRatio}x</p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[10px]">
+                                                    <span className="text-emerald-400/80">{stat.advancing} 🟢</span>
+                                                    <span className="text-slate-500">{stat.count}</span>
+                                                    <span className="text-rose-400/80">🔴 {stat.declining}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </GlassCard>
+                        )}
 
                         {/* Filters */}
                         <GlassCard className="p-4">
