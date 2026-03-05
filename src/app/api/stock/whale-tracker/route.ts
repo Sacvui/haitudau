@@ -104,8 +104,8 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                     aiInsight = result.response.text().trim();
                 } catch (aiErr: any) {
                     console.error('AI Insight Error:', aiErr.message);
-                    aiInsight = 'Kết nối máy chủ AI gặp gián đoạn. Đang hiển thị phân tích kỹ thuật hệ thống.';
-                    // Diagnostic info for developer (hidden in response if needed, for now just log more)
+                    aiInsight = `Lỗi kết nối AI: ${aiErr.message}`;
+                    // Diagnostic info for developer
                     console.log(`[WhaleTracker] Diagnostic: Key used: ${apiKey?.substring(0, 6)}...${apiKey?.substring(apiKey.length - 4)}. Error: ${aiErr.message}`);
                 }
             } else {
