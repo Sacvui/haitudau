@@ -29,30 +29,14 @@ function calculateConsistency(history: any[]): number {
     return score;
 }
 
-// Generate Top 20 dynamically based on dividend consistency and history from dividendsData
-const generateTop20 = () => {
-    const allSymbols = Object.keys(dividendsData);
-    const scoredSymbols = allSymbols.map(sym => {
-        const divInfo = (dividendsData as any)[sym] || [];
-        const consistency = calculateConsistency(divInfo);
-
-        // Sum of all dividends as a tie-breaker
-        const totalDivs = divInfo.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
-
-        return { symbol: sym, consistency, totalDivs };
-    });
-
-    // Sort by consistency (desc), then total dividends (desc)
-    scoredSymbols.sort((a, b) => {
-        if (b.consistency !== a.consistency) return b.consistency - a.consistency;
-        return b.totalDivs - a.totalDivs;
-    });
-
-    return scoredSymbols.slice(0, 20).map(s => s.symbol);
-};
-
-// Top 20 Recommended by Hai (Dynamically Ranked)
-const TOP20_SYMBOLS = generateTop20();
+// Top 20 Recommended by Hai (Curated High-Quality Fundamental Stocks)
+const TOP20_SYMBOLS = [
+    'FPT', 'HPG', 'VCB', 'ACB', 'MBB', 'TCB', // Core Banking & Tech & Steel
+    'PNJ', 'MWG', 'VNM', 'MSN',               // Retail & Consumer
+    'DGC', 'GMD', 'REE', 'CTR',               // Logistics, Utilities, Tech Infra, Chemicals
+    'KDH', 'VHM', 'SZC', 'KBC',               // Real Estate & Industrial
+    'VHC', 'SSI'                              // Export & Financials
+];
 
 interface StockRealtimeData {
     symbol: string;
@@ -145,17 +129,22 @@ export async function GET(request: NextRequest) {
             const endTs = Math.floor(Date.now() / 1000);
             const startTs = endTs - 20 * 24 * 60 * 60; // 20 days back to get enough data for 10d avg
 
-            // CRITICAL FIX: Limit fallback requests to max 30 symbols to prevent Vercel 10s timeout
-            const fallbackTargets = targetSymbols.slice(0, 30);
-            console.log(`[Screener] Restricting fallback history to ${fallbackTargets.length} symbols...`);
+            // FIX: Remove the hard limit of 30 to allow VN100 to fully load.
+            // Using a high-concurrency Promise.all to prevent Vercel 10s timeout.
+            const fallbackTargets = targetSymbols;
+            console.log(`[Screener] Fetching DNSE fallback history for ${fallbackTargets.length} symbols concurrently...`);
 
-            const BATCH_SIZE = 15;
+            // To avoid killing the DNSE API, process in parallel chunks of 25.
+            const BATCH_SIZE = 25;
             for (let i = 0; i < fallbackTargets.length; i += BATCH_SIZE) {
                 const batch = fallbackTargets.slice(i, i + BATCH_SIZE);
-                for (const sym of batch) {
+
+                await Promise.allSettled(batch.map(async (sym) => {
                     try {
                         const hRes = await fetch(`https://dchart-api.vndirect.com.vn/dchart/history?resolution=D&symbol=${sym}&from=${startTs}&to=${endTs}`, {
-                            next: { revalidate: 0 }
+                            next: { revalidate: 0 },
+                            // Reduced timeout so it fails fast rather than holding up the whole batch
+                            signal: AbortSignal.timeout(3000)
                         });
                         const hd = await hRes.json();
                         if (hd.s === 'ok' && hd.c && hd.c.length >= 2) {
@@ -176,13 +165,9 @@ export async function GET(request: NextRequest) {
                             };
                         }
                     } catch (e: any) {
-                        console.warn(`[Screener] Failed to fetch fallback data for ${sym}:`, e.message);
+                        // Silent catch to prevent one failed fetch from breaking the batch
                     }
-                }
-                // Tạm nghỉ 50ms giữa các batch để tránh bị Rate Limit (429) từ VNDirect
-                if (i + BATCH_SIZE < fallbackTargets.length) {
-                    await new Promise(r => setTimeout(r, 50));
-                }
+                }));
             }
             console.log(`[Screener] DNSE fallback completed.`);
         }
