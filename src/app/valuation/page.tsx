@@ -115,23 +115,33 @@ export default function ValuationPage() {
                 eps: data.eps,
                 pe: data.pe,
                 bvps: data.bvps,
+                pb: data.pb,
                 roe: data.roe,
                 lastDividend: data.lastDividend,
                 dividendGrowth: data.dividendGrowth5Y,
-                industryPE: data.industryPE,
-                dividendYield: data.dividendYield,
+                industryPE: data.industryPE || 15,
+                dividendYield: data.dividendYield
             };
 
+            // Assuming projectionYears and sentimentScore are defined elsewhere or default values are used
+            // For this change, we'll use placeholder values if not defined in the original context
+            const projectionYears = 10; // Placeholder, adjust as needed
+            const sentimentScore = sentiment?.score || 50; // Use existing sentiment state
+
             const result = runFullValuation(input, {
-                requiredReturn,
-                marketSentimentScore: sentiment?.score || 50
+                requiredReturn: requiredReturn,
+                projectionYears: projectionYears,
+                marketSentimentScore: sentimentScore
             });
             setValuation(result);
 
-            // Generate sensitivity table
-            const epsGrowth = Math.min(data.roe * 0.6, 25) / 100;
-            const sensTable = generateSensitivityTable(data.eps, epsGrowth, requiredReturn / 100);
-            setSensitivity(sensTable);
+            const sensitivity = generateSensitivityTable(
+                data.eps,
+                Math.min(data.roe * 0.6, 25) / 100, // Matching default logic
+                requiredReturn / 100,
+                projectionYears
+            );
+            setSensitivity(sensitivity); // Changed sensTable to sensitivity
 
             // Reverse DCF calculation
             const impliedG = calculateReverseDCF(data.currentPrice, data.eps, requiredReturn / 100, 10, 0.03);

@@ -28,6 +28,9 @@ const USERS_FILE = path.join(process.cwd(), 'src', 'data', 'users.json');
 const SESSION_COOKIE_NAME = 'stock_session';
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// Mật khẩu bí mật để ký JWT thủ công (Do serverless hay bị cold start)
+const JWT_SECRET = process.env.CRON_SECRET || 'stock-analyzer-fallback-secret-key-2026';
+
 // ───── Helpers ─────
 export function hashPassword(password: string): string {
     return crypto.createHash('sha256').update(password).digest('hex');
@@ -37,8 +40,15 @@ export function verifyPassword(password: string, hash: string): boolean {
     return hashPassword(password) === hash;
 }
 
-export function generateSessionToken(): string {
-    return crypto.randomBytes(32).toString('hex');
+// Hàm sinh JWT thủ công đơn giản (Stateless session)
+export function generateSessionToken(user: Omit<User, 'passwordHash'>): string {
+    const payload = {
+        user,
+        exp: Date.now() + SESSION_DURATION_MS
+    };
+    const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const signature = crypto.createHmac('sha256', JWT_SECRET).update(payloadBase64).digest('base64url');
+    return `${payloadBase64}.${signature}`;
 }
 
 // ───── Data Access ─────
@@ -101,8 +111,12 @@ export function authenticateUser(username: string, password: string): { user: Om
     if (!user) return null;
     if (!verifyPassword(password, user.passwordHash)) return null;
 
-    // Create session
-    const token = generateSessionToken();
+    const { passwordHash, ...safeUser } = user;
+
+    // Create stateless session token
+    const token = generateSessionToken(safeUser);
+
+    // We still write to RAM cache just for local debugging/tracking, but auth doesn't depend on it anymore
     if (!data.sessions) data.sessions = {};
     data.sessions[token] = {
         userId: user.id,
@@ -117,27 +131,32 @@ export function authenticateUser(username: string, password: string): { user: Om
 
     writeUsersData(data);
 
-    const { passwordHash, ...safeUser } = user;
     return { user: safeUser, token };
 }
 
 export function validateSession(token: string): Omit<User, 'passwordHash'> | null {
     if (!token) return null;
-    const data = readUsersData();
-    const session = data.sessions?.[token];
-    if (!session) return null;
 
-    if (new Date(session.expiresAt) < new Date()) {
-        delete data.sessions[token];
-        writeUsersData(data);
-        return null;
+    try {
+        // Decode our custom JWT
+        const parts = token.split('.');
+        if (parts.length !== 2) return null;
+
+        const [payloadBase64, signature] = parts;
+
+        // Verify signature
+        const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(payloadBase64).digest('base64url');
+        if (signature !== expectedSignature) return null;
+
+        // Verify expiry
+        const payloadStr = Buffer.from(payloadBase64, 'base64url').toString('utf-8');
+        const payload = JSON.parse(payloadStr);
+        if (Date.now() > payload.exp) return null;
+
+        return payload.user;
+    } catch {
+        return null; // Token malformed or tampered
     }
-
-    const user = data.users.find(u => u.id === session.userId);
-    if (!user) return null;
-
-    const { passwordHash, ...safeUser } = user;
-    return safeUser;
 }
 
 export function invalidateSession(token: string): void {

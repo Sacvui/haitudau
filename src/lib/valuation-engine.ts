@@ -10,6 +10,7 @@ export interface ValuationInput {
     eps: number;
     pe: number;               // current P/E ratio
     bvps: number;
+    pb: number;               // current P/B ratio
     roe: number;              // as percentage (e.g., 20 = 20%)
     lastDividend: number;     // annual dividend per share
     dividendGrowth: number;   // historical dividend growth rate (%)
@@ -241,7 +242,12 @@ export function runFullValuation(
 ): ValuationSummary {
     const sentimentScore = customParams?.marketSentimentScore ?? 50;
     const requiredReturn = (customParams?.requiredReturn || 12) / 100;
-    const epsGrowth = (customParams?.epsGrowthRate ?? Math.min(input.roe * 0.6, 25)) / 100; // ROE × retention ratio
+
+    // FIX: Safely cap EPS growth so DCF doesn't go crazy, but allow real growth to shine
+    // Growth stocks often have high ROE. We take 60% of ROE as sustainable growth (assume 40% payout).
+    const calculatedGrowth = input.roe ? Math.min(input.roe * 0.6, 25) : 10;
+    const epsGrowth = (customParams?.epsGrowthRate ?? calculatedGrowth) / 100;
+
     const projYears = customParams?.projectionYears || 10;
     const divGrowth = Math.max(0, Math.min(input.dividendGrowth / 100, requiredReturn - 0.01));
 
@@ -340,14 +346,28 @@ export function runFullValuation(
     const validResults = results.filter(r => r.intrinsicValue > 0 && r.confidence > 20);
 
     // Apply penalty to extreme outliers (e.g., Graham Number for banks with huge BVPS)
+    // FIX: Apply Growth/Tech company adjustments (High P/E, High ROE, High P/B)
+    const isGrowthStock = input.pe > 15 && input.pb >= 3 && input.roe >= 15;
+
     const adjustedResults = validResults.map(r => {
         let adjConfidence = r.confidence;
+
+        // Growth stocks get heavily penalized in Graham (which expects P/E < 15 and P/B < 1.5)
+        if (isGrowthStock && r.methodKey === 'graham') {
+            adjConfidence = r.confidence * 0.1; // Virtually ignore Ben Graham for FPT/MWG
+        }
+
+        // Growth stocks get a slight boost in DCF confidence
+        if (isGrowthStock && r.methodKey === 'dcf') {
+            adjConfidence = Math.min(100, r.confidence * 1.5);
+        }
+
         if (r.intrinsicValue > input.currentPrice * 2) {
             // If valuation is >200% of current price, slash its confidence weight heavily
-            adjConfidence = r.confidence * 0.2;
+            adjConfidence = adjConfidence * 0.2;
         } else if (r.intrinsicValue > input.currentPrice * 1.5) {
             // If valuation is >150% of current price, reduce confidence moderately
-            adjConfidence = r.confidence * 0.5;
+            adjConfidence = adjConfidence * 0.5;
         }
         return { ...r, adjConfidence };
     });

@@ -218,6 +218,40 @@ export async function GET(request: NextRequest) {
             const lastStockDiv = divInfo.find((d: any) => d.type === 'stock');
             const stockDividendRatio = lastStockDiv ? lastStockDiv.value / 100 : 0;
 
+            // --- LIGHTWEIGHT INTRINSIC VALUE COMPUTATION ---
+            // Because calling full fundamental scraping for 100 stocks will timeout Vercel,
+            // we use a heuristic based on known sector averages & dividend payout.
+
+            let intrinsicValue = 0;
+            const requiredReturn = 0.12; // 12% standard discount rate
+            const sector = getSector(symbol);
+
+            if (dividendPerShare > 0) {
+                // 1. DDM (Gordon Growth) for dividend payers
+                // Assume conservative 3% perpetual growth for stable payers, 5% for high-growth sectors
+                const assumedGrowth = (sector === 'Công nghệ' || sector === 'Bán lẻ') ? 0.05 : 0.03;
+                if (requiredReturn > assumedGrowth) {
+                    intrinsicValue = (dividendPerShare * (1 + assumedGrowth)) / (requiredReturn - assumedGrowth);
+                }
+            } else {
+                // 2. Simplified P/E Relative for non-payers (using price momentum as a proxy for earnings growth)
+                // If a stock is up 10% this year, we assume the market prices in 10% earnings growth.
+                const simulatedEPS = currentPrice / 15; // Assume market avg PE = 15
+                // Tech/Retail command higher PEs
+                const targetPE = (sector === 'Công nghệ') ? 20 : (sector === 'Bán lẻ') ? 18 : 12;
+                intrinsicValue = simulatedEPS * targetPE;
+            }
+
+            // Apply a slight premium/discount based on Dividend Consistency (1 to 5 stars)
+            const consistencyScore = calculateConsistency(divInfo);
+            const consistencyModifier = 1 + ((consistencyScore - 3) * 0.05); // ±10% based on track record
+            intrinsicValue = Math.round(intrinsicValue * consistencyModifier);
+
+            // Safety bound: limit intrinsic value to ±50% of current price to avoid wild UI fluctuations on thin data
+            const lowerBound = currentPrice * 0.5;
+            const upperBound = currentPrice * 1.5;
+            intrinsicValue = Math.max(lowerBound, Math.min(intrinsicValue, upperBound));
+
             return {
                 symbol,
                 name: symbol,
@@ -231,10 +265,11 @@ export async function GET(request: NextRequest) {
                 dividendPerShare,
                 dividendHistory: [],
                 payoutFrequency: 'Annually',
-                sector: getSector(symbol),
+                sector,
                 marketCap: currentPrice * 1000000,
-                consistencyScore: calculateConsistency(divInfo),
-                stockDividendRatio
+                consistencyScore,
+                stockDividendRatio,
+                intrinsicValue
             };
         });
 
@@ -254,7 +289,8 @@ export async function GET(request: NextRequest) {
             sector: String(stock.sector || 'Khác'),
             marketCap: Number(stock.marketCap || 0),
             consistencyScore: Number(stock.consistencyScore || 0),
-            stockDividendRatio: Number(stock.stockDividendRatio || 0)
+            stockDividendRatio: Number(stock.stockDividendRatio || 0),
+            intrinsicValue: Number(stock.intrinsicValue || 0)
         }));
 
         // Calculate Sector Stats

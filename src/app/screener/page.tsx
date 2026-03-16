@@ -49,6 +49,7 @@ interface StockDividendData {
     sector: string;
     marketCap: number;
     consistencyScore: number;
+    intrinsicValue: number; // Added for Giá Nội Tại column
 }
 
 interface DividendEvent {
@@ -69,7 +70,7 @@ interface SectorStat {
     count: number;
 }
 
-type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol' | 'shortTermRec' | 'longTermRec' | 'volumeRatio';
+type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol' | 'shortTermRec' | 'longTermRec' | 'volumeRatio' | 'intrinsicValue';
 
 // Recommendations Scoring Helpers (for sorting)
 const getShortTermScore = (stock: StockDividendData) => {
@@ -689,6 +690,14 @@ export default function DividendScreenerPage() {
                                                     </span>
                                                 </th>
                                                 <th
+                                                    className="p-3 text-right text-xs font-bold text-slate-400 uppercase cursor-pointer hover:text-white transition-colors"
+                                                    onClick={() => handleSort('intrinsicValue')}
+                                                >
+                                                    <span className="flex items-center justify-end gap-1">
+                                                        Giá Nội Tại <ArrowUpDown className={`w-3 h-3 ${sortField === 'intrinsicValue' ? 'text-indigo-400' : ''}`} />
+                                                    </span>
+                                                </th>
+                                                <th
                                                     className="p-3 text-center text-xs font-bold text-slate-400 uppercase cursor-pointer hover:text-white transition-colors"
                                                     onClick={() => handleSort('consistencyScore')}
                                                 >
@@ -755,6 +764,20 @@ export default function DividendScreenerPage() {
                                                         </td>
                                                         <td className="p-3 text-right font-mono text-indigo-400">
                                                             {stock.stockDividendRatio > 0 ? `${(stock.stockDividendRatio * 100).toFixed(0)}%` : '-'}
+                                                        </td>
+                                                        <td className="p-3 text-right font-mono">
+                                                            <div className="flex flex-col items-end">
+                                                                <span className="text-white font-bold">{(stock.intrinsicValue / 1000).toFixed(1)}K</span>
+                                                                {(() => {
+                                                                    const margin = (stock.intrinsicValue - stock.currentPrice) / stock.intrinsicValue * 100;
+                                                                    const isValid = stock.intrinsicValue > 0;
+                                                                    if (!isValid) return <span className="text-[10px] text-slate-500">N/A</span>;
+
+                                                                    if (margin >= 15) return <span className="text-[10px] text-emerald-400">Rẻ ({margin.toFixed(0)}%)</span>;
+                                                                    if (margin >= -10) return <span className="text-[10px] text-amber-400">Hợp lý</span>;
+                                                                    return <span className="text-[10px] text-rose-400">Đắt</span>;
+                                                                })()}
+                                                            </div>
                                                         </td>
                                                         <td className="p-3">
                                                             <div className="flex items-center justify-center gap-0.5">
