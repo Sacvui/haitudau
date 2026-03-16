@@ -73,6 +73,10 @@ export default function ValuationPage() {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [sentiment, setSentiment] = useState<{ score: number; label: string; color: string; breakdown: any } | null>(null);
 
+    // Smart Entry Signal
+    const [entrySignal, setEntrySignal] = useState<any>(null);
+    const [entryLoading, setEntryLoading] = useState(false);
+
     // Fetch Market Sentiment on mount
     useEffect(() => {
         const fetchSentiment = async () => {
@@ -152,6 +156,15 @@ export default function ValuationPage() {
         } finally {
             setLoading(false);
         }
+
+        // Fetch Smart Entry Signal in background (non-blocking)
+        setEntryLoading(true);
+        fetch(`/api/stock/entry-signal?symbol=${symbol.trim().toUpperCase()}`)
+            .then(r => r.json())
+            .then(j => { if (j.success) setEntrySignal(j); })
+            .catch(() => { })
+            .finally(() => setEntryLoading(false));
+
     }, [symbol, requiredReturn, sentiment]);
 
     // Auto-load from URL params (when navigating from homepage search)
@@ -284,6 +297,110 @@ export default function ValuationPage() {
                             />
                         </div>
                     </div>
+
+                    {/* Smart Entry Signal Panel */}
+                    {(entrySignal || entryLoading) && (
+                        <div className="mt-4">
+                            <div className="bg-[#111827] border border-slate-800 rounded-2xl overflow-hidden">
+                                <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
+                                            <Target className="w-5 h-5 text-cyan-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-white text-sm">ĐIỂM VÀO LỆNH THÔNG MINH</h3>
+                                            <p className="text-[10px] text-slate-500">Volume Spike × Support Zone × Intrinsic Margin</p>
+                                        </div>
+                                    </div>
+                                    {entrySignal && (
+                                        <div className={`px-4 py-2 rounded-xl font-black text-sm ${entrySignal.compositeScore >= 8 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                                            entrySignal.compositeScore >= 6 ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' :
+                                                entrySignal.compositeScore >= 4 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                                                    'bg-red-500/20 text-red-400 border border-red-500/30'
+                                            }`}>
+                                            {entrySignal.verdictEmoji} {entrySignal.verdict}
+                                        </div>
+                                    )}
+                                </div>
+                                {entryLoading ? (
+                                    <div className="p-8 flex items-center justify-center">
+                                        <Loader2 className="w-6 h-6 text-cyan-500/50 animate-spin" />
+                                        <span className="ml-3 text-slate-500 text-sm">Đang phân tích tín hiệu...</span>
+                                    </div>
+                                ) : entrySignal ? (
+                                    <div className="p-6">
+                                        {/* Score Gauge */}
+                                        <div className="flex items-center gap-6 mb-6">
+                                            <div className="relative w-24 h-24 flex-shrink-0">
+                                                <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                                                    <circle cx="50" cy="50" r="42" fill="none" stroke="#1e293b" strokeWidth="8" />
+                                                    <circle cx="50" cy="50" r="42" fill="none"
+                                                        stroke={entrySignal.compositeScore >= 8 ? '#10b981' : entrySignal.compositeScore >= 6 ? '#0ea5e9' : entrySignal.compositeScore >= 4 ? '#f59e0b' : '#ef4444'}
+                                                        strokeWidth="8" strokeLinecap="round"
+                                                        strokeDasharray={`${entrySignal.compositeScore * 26.4} 264`}
+                                                    />
+                                                </svg>
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                    <span className="text-2xl font-black text-white">{entrySignal.compositeScore}</span>
+                                                    <span className="text-[9px] text-slate-500 font-bold">/10</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-white font-bold">{entrySignal.symbol} — {entrySignal.verdict}</p>
+                                                <p className="text-slate-400 text-xs mt-1">Giá hiện tại: <span className="text-white font-bold">{Math.round(entrySignal.currentPrice).toLocaleString()}đ</span></p>
+                                                {entrySignal.context?.sma20 && (
+                                                    <p className="text-slate-500 text-xs">SMA20: {entrySignal.context.sma20.toLocaleString()}đ • Đáy 20P: {entrySignal.context.low20.toLocaleString()}đ</p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* 3 Signal Breakdown */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {[{
+                                                title: '📊 Volume Spike',
+                                                signal: entrySignal.signals.volume,
+                                                color: entrySignal.signals.volume.score >= 6 ? 'emerald' : entrySignal.signals.volume.score >= 4 ? 'amber' : 'red'
+                                            }, {
+                                                title: '🛡️ Support Zone',
+                                                signal: entrySignal.signals.support,
+                                                color: entrySignal.signals.support.score >= 6 ? 'emerald' : entrySignal.signals.support.score >= 4 ? 'amber' : 'red'
+                                            }, {
+                                                title: '💎 Intrinsic Margin',
+                                                signal: entrySignal.signals.margin,
+                                                color: entrySignal.signals.margin.score >= 6 ? 'emerald' : entrySignal.signals.margin.score >= 4 ? 'amber' : 'red'
+                                            }].map((item, idx) => (
+                                                <div key={idx} className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-xs font-bold text-slate-300">{item.title}</span>
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${item.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                            item.color === 'amber' ? 'bg-amber-500/20 text-amber-400' :
+                                                                'bg-red-500/20 text-red-400'
+                                                            }`}>
+                                                            {item.signal.score}/10
+                                                        </span>
+                                                    </div>
+                                                    <p className={`text-sm font-bold mb-1 ${item.color === 'emerald' ? 'text-emerald-400' :
+                                                        item.color === 'amber' ? 'text-amber-400' :
+                                                            'text-red-400'
+                                                        }`}>{item.signal.label}</p>
+                                                    <p className="text-[11px] text-slate-500 leading-relaxed">{item.signal.description}</p>
+                                                    <div className="mt-2 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                        <div className={`h-full rounded-full transition-all ${item.color === 'emerald' ? 'bg-emerald-500' :
+                                                            item.color === 'amber' ? 'bg-amber-500' :
+                                                                'bg-red-500'
+                                                            }`}
+                                                            style={{ width: `${item.signal.score * 10}%` }}
+                                                        />
+                                                    </div>
+                                                    <p className="text-[9px] text-slate-600 mt-1">Trọng số: {item.signal.weight}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Error */}
                     {error && (
