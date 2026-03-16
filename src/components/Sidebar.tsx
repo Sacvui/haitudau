@@ -17,6 +17,7 @@ import {
     Calendar,
     Lock,
     Calculator,
+    Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -58,7 +59,7 @@ const NAV_GROUPS = [
 export function Sidebar({ className }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
-    const [user, setUser] = useState<{ username: string, displayName?: string } | null>(null);
+    const [user, setUser] = useState<{ username: string, displayName?: string, role?: string } | null>(null);
 
     useEffect(() => {
         fetch('/api/auth/me').then(r => r.json()).then(data => {
@@ -126,6 +127,23 @@ export function Sidebar({ className }: SidebarProps) {
 
                 <div>
                     <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-4 mb-2">Hệ Thống</div>
+                    {user?.role === 'admin' && (
+                        <Link
+                            href="/admin/users"
+                            className={cn(
+                                "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group relative overflow-hidden mb-1",
+                                pathname === "/admin/users"
+                                    ? "bg-gradient-to-r from-rose-500/10 to-orange-500/5 text-rose-400 border border-rose-500/20"
+                                    : "text-slate-400 hover:text-white hover:bg-slate-800/40"
+                            )}
+                        >
+                            {pathname === "/admin/users" && (
+                                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-rose-500 shadow-[0_0_10px_2px_rgba(244,63,94,0.5)]" />
+                            )}
+                            <Users className={cn("w-5 h-5 transition-colors", pathname === "/admin/users" ? "text-rose-400" : "text-slate-500 group-hover:text-slate-300")} />
+                            Quản Lý User
+                        </Link>
+                    )}
                     <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/40 transition-all duration-200">
                         <Settings className="w-5 h-5 text-slate-500" />
                         Cài đặt
