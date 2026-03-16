@@ -42,7 +42,10 @@ export function generateSessionToken(): string {
 }
 
 // ───── Data Access ─────
+let memoryCache: UsersData | null = null;
+
 function readUsersData(): UsersData {
+    if (memoryCache) return memoryCache;
     try {
         const raw = fs.readFileSync(USERS_FILE, 'utf-8');
         return JSON.parse(raw);
@@ -52,7 +55,16 @@ function readUsersData(): UsersData {
 }
 
 function writeUsersData(data: UsersData): void {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    memoryCache = data; // Always update memory cache first for Serverless environments
+    try {
+        fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (e: any) {
+        // In Vercel (Production), the file system is read-only (EROFS)
+        // We gracefully swallow this error and rely on memoryCache.
+        if (e.code !== 'EROFS') {
+            console.warn('[Auth] Failed to write users.json:', e.message);
+        }
+    }
 }
 
 // ───── Initialize default admin ─────
