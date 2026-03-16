@@ -1,10 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Logo } from '@/components/ui/Logo';
-import { useAuth } from '@/contexts/AuthContext';
 import {
     LayoutDashboard,
     LineChart,
@@ -58,9 +57,25 @@ const NAV_GROUPS = [
 
 export function Sidebar({ className }: SidebarProps) {
     const pathname = usePathname();
-    const { user, signOut, isConfigured } = useAuth();
+    const router = useRouter();
+    const [user, setUser] = useState<{ username: string, displayName?: string } | null>(null);
 
-    const displayName = user?.email?.split('@')[0] || 'Guest';
+    useEffect(() => {
+        fetch('/api/auth/me').then(r => r.json()).then(data => {
+            if (data.authenticated && data.user) {
+                setUser(data.user);
+            }
+        }).catch(() => { });
+    }, [pathname]);
+
+    const handleSignOut = async () => {
+        await fetch('/api/auth/login', { method: 'DELETE' });
+        setUser(null);
+        router.push('/');
+        router.refresh();
+    };
+
+    const displayName = user?.displayName || user?.username || 'Guest';
     const initials = displayName.substring(0, 2).toUpperCase();
 
     return (
@@ -120,32 +135,48 @@ export function Sidebar({ className }: SidebarProps) {
 
             {/* 3. USER PROFILE */}
             <div className="flex-none p-4 mt-auto">
-                <div className="p-3 bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-[2px] shadow-lg shadow-indigo-500/20">
-                            <div className="w-full h-full rounded-full bg-[#0b1121] flex items-center justify-center">
-                                <span className="font-bold text-sm text-white">{initials}</span>
+                {user ? (
+                    <div className="p-3 bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-[2px] shadow-lg shadow-indigo-500/20">
+                                <div className="w-full h-full rounded-full bg-[#0b1121] flex items-center justify-center">
+                                    <span className="font-bold text-sm text-white">{initials}</span>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-white truncate">{user ? displayName : 'Guest'}</p>
-                            <p className={`text-[10px] font-medium tracking-wide ${user ? 'text-emerald-400' : 'text-slate-500'}`}>
-                                {user ? '● Đã đăng nhập' : '○ Chưa đăng nhập'}
-                            </p>
-                        </div>
-                        {user && (
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-white truncate">{displayName}</p>
+                                <p className="text-[10px] font-medium tracking-wide text-emerald-400">
+                                    ● Đã đăng nhập
+                                </p>
+                            </div>
                             <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg"
-                                onClick={() => signOut()}
+                                onClick={handleSignOut}
                                 title="Đăng xuất"
                             >
                                 <LogOut className="w-4 h-4" />
                             </Button>
-                        )}
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    <Link href="/login" className="block p-3 bg-slate-800/30 hover:bg-slate-800/60 rounded-2xl border border-slate-700/50 hover:border-indigo-500/30 backdrop-blur-sm transition-all group cursor-pointer">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-slate-800 p-[2px] shadow-inner group-hover:bg-slate-700 transition-colors">
+                                <div className="w-full h-full rounded-full bg-[#0b1121] flex items-center justify-center">
+                                    <span className="font-bold text-sm text-slate-500">GU</span>
+                                </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-slate-300 group-hover:text-white transition-colors truncate">Guest</p>
+                                <p className="text-[10px] font-medium tracking-wide text-slate-500 group-hover:text-indigo-400 transition-colors">
+                                    ○ Chưa đăng nhập (Nhấn)
+                                </p>
+                            </div>
+                        </div>
+                    </Link>
+                )}
             </div>
         </div>
     );
