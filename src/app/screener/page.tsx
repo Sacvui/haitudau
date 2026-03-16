@@ -489,64 +489,151 @@ export default function DividendScreenerPage() {
                             </div>
                         </GlassCard>
 
-                        {/* Sector Heatmap (Sóng Ngành) */}
-                        {sectorStats.length > 0 && selectedGroup !== 'top20' && (
-                            <GlassCard className="p-4 border-slate-800">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <PieChart className="w-5 h-5 text-purple-400" />
-                                    <h2 className="text-sm font-bold text-slate-300 uppercase">Sóng Ngành (Sector Focus)</h2>
+                        {/* Sector Heatmap (Sóng Ngành) - Premium Design */}
+                        {sectorStats.length > 0 && (
+                            <GlassCard className="p-0 border-slate-800 overflow-hidden">
+                                {/* Header with gradient */}
+                                <div className="relative px-5 py-4 bg-gradient-to-r from-purple-900/30 via-indigo-900/20 to-slate-900/10 border-b border-slate-800">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500/30 to-indigo-500/30 flex items-center justify-center backdrop-blur-sm">
+                                                <PieChart className="w-5 h-5 text-purple-400" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-sm font-black text-white uppercase tracking-wider">Sóng Ngành</h2>
+                                                <p className="text-[10px] text-slate-500">Sector Rotation • Dòng tiền theo ngành</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-[10px]">
+                                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Dẫn sóng</span>
+                                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500" /> Hồi phục</span>
+                                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" /> Phân phối</span>
+                                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-600" /> Tích lũy</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                    {sectorStats.map((stat) => {
-                                        // Phân loại trạng thái ngành
+
+                                {/* Sector Cards Grid */}
+                                <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                                    {sectorStats.map((stat, idx) => {
+                                        // Sector emoji mapping
+                                        const sectorEmoji: Record<string, string> = {
+                                            'Ngân hàng': '🏦', 'Bất động sản': '🏗️', 'Công nghệ': '💻',
+                                            'Bán lẻ': '🛒', 'Thép': '⚙️', 'Tiêu dùng': '🧴',
+                                            'Dầu khí': '⛽', 'Điện': '⚡', 'Hàng không': '✈️',
+                                            'Bảo hiểm': '🛡️', 'Chứng khoán': '📈', 'Cao su': '🌳',
+                                            'Hóa chất': '🧪', 'Khác': '📦'
+                                        };
+                                        const emoji = sectorEmoji[stat.sector] || '📦';
+
+                                        // Status classification
                                         const isLeading = stat.averageVolumeRatio > 1.2 && stat.averageChange > 0.5;
                                         const isWeakening = stat.averageVolumeRatio > 1.2 && stat.averageChange < -0.5;
                                         const isRecovering = stat.averageVolumeRatio <= 1.2 && stat.averageChange > 0;
 
-                                        let bgColor = "bg-slate-800/40 border-slate-700 hover:bg-slate-700/50";
-                                        let textColor = "text-slate-300";
-                                        let statusText = "Tích lũy";
+                                        let statusText = 'Tích lũy';
+                                        let statusDot = 'bg-slate-500';
+                                        let cardBorder = 'border-slate-800';
+                                        let cardBg = 'bg-slate-900/30';
+                                        let glowColor = '';
 
                                         if (isLeading) {
-                                            bgColor = "bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20";
-                                            textColor = "text-emerald-400";
-                                            statusText = "Dẫn sóng";
+                                            statusText = '🔥 Dẫn sóng';
+                                            statusDot = 'bg-emerald-500';
+                                            cardBorder = 'border-emerald-500/40';
+                                            cardBg = 'bg-gradient-to-br from-emerald-500/10 to-emerald-900/5';
+                                            glowColor = 'shadow-[0_0_20px_rgba(16,185,129,0.1)]';
                                         } else if (isWeakening) {
-                                            bgColor = "bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20";
-                                            textColor = "text-rose-400";
-                                            statusText = "Phân phối";
+                                            statusText = '📉 Phân phối';
+                                            statusDot = 'bg-rose-500';
+                                            cardBorder = 'border-rose-500/30';
+                                            cardBg = 'bg-gradient-to-br from-rose-500/10 to-rose-900/5';
                                         } else if (isRecovering) {
-                                            bgColor = "bg-indigo-500/10 border-indigo-500/30 hover:bg-indigo-500/20";
-                                            textColor = "text-indigo-400";
-                                            statusText = "Hồi phục";
+                                            statusText = '📊 Hồi phục';
+                                            statusDot = 'bg-indigo-500';
+                                            cardBorder = 'border-indigo-500/30';
+                                            cardBg = 'bg-gradient-to-br from-indigo-500/10 to-indigo-900/5';
                                         }
+
+                                        // Breadth ratio
+                                        const total = stat.advancing + stat.declining;
+                                        const breadthPercent = total > 0 ? Math.round((stat.advancing / total) * 100) : 50;
+
+                                        // Volume flow bar width (normalized to max)
+                                        const maxVol = Math.max(...sectorStats.map(s => s.averageVolumeRatio));
+                                        const volFlowPercent = maxVol > 0 ? Math.round((stat.averageVolumeRatio / maxVol) * 100) : 50;
 
                                         return (
                                             <div
                                                 key={stat.sector}
-                                                className={`p-3 rounded-xl cursor-pointer transition-all border ${bgColor} ${filter.sector === stat.sector ? 'ring-2 ring-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.3)]' : ''}`}
+                                                className={`relative p-4 rounded-xl cursor-pointer transition-all duration-300 border ${cardBorder} ${cardBg} ${glowColor} hover:scale-[1.02] hover:shadow-lg ${filter.sector === stat.sector
+                                                        ? 'ring-2 ring-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.3)]'
+                                                        : ''
+                                                    }`}
                                                 onClick={() => setFilter(f => ({ ...f, sector: filter.sector === stat.sector ? 'all' : stat.sector }))}
                                             >
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <span className={`font-bold text-sm ${textColor} truncate max-w-[80px]`} title={stat.sector}>{stat.sector}</span>
-                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${bgColor.replace('hover:', '')}`}>
+                                                {/* Rank badge */}
+                                                {idx < 3 && (
+                                                    <div className={`absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-black' :
+                                                            idx === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-black' :
+                                                                'bg-gradient-to-br from-amber-700 to-amber-900 text-amber-200'
+                                                        }`}>
+                                                        #{idx + 1}
+                                                    </div>
+                                                )}
+
+                                                {/* Sector name + emoji */}
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="text-lg">{emoji}</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-bold text-white truncate" title={stat.sector}>{stat.sector}</p>
+                                                        <p className="text-[10px] text-slate-500">{stat.count} mã</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Price change + Status */}
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <span className={`text-lg font-black font-mono ${stat.averageChange > 0 ? 'text-emerald-400' : stat.averageChange < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                                        {stat.averageChange > 0 ? '+' : ''}{stat.averageChange}%
+                                                    </span>
+                                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded-full">
                                                         {statusText}
                                                     </span>
                                                 </div>
-                                                <div className="flex justify-between items-end">
-                                                    <div>
-                                                        <p className={`font-mono text-sm font-bold ${stat.averageChange > 0 ? 'text-emerald-400' : stat.averageChange < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
-                                                            {stat.averageChange > 0 ? '+' : ''}{stat.averageChange}%
-                                                        </p>
+
+                                                {/* Volume Flow bar */}
+                                                <div className="mb-2">
+                                                    <div className="flex items-center justify-between text-[10px] mb-1">
+                                                        <span className="text-slate-500">Dòng tiền</span>
+                                                        <span className="text-indigo-400 font-bold">{stat.averageVolumeRatio}x</span>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="font-mono text-xs font-bold text-indigo-400">{stat.averageVolumeRatio}x</p>
+                                                    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-500 ${stat.averageVolumeRatio >= 1.5 ? 'bg-gradient-to-r from-indigo-500 to-purple-500' :
+                                                                    stat.averageVolumeRatio >= 1.0 ? 'bg-gradient-to-r from-sky-500 to-indigo-500' :
+                                                                        'bg-slate-600'
+                                                                }`}
+                                                            style={{ width: `${volFlowPercent}%` }}
+                                                        />
                                                     </div>
                                                 </div>
-                                                <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[10px]">
-                                                    <span className="text-emerald-400/80">{stat.advancing} 🟢</span>
-                                                    <span className="text-slate-500">{stat.count}</span>
-                                                    <span className="text-rose-400/80">🔴 {stat.declining}</span>
+
+                                                {/* Breadth ratio bar (Advancing vs Declining) */}
+                                                <div>
+                                                    <div className="flex items-center justify-between text-[10px] mb-1">
+                                                        <span className="text-emerald-400/80">{stat.advancing} tăng</span>
+                                                        <span className="text-rose-400/80">{stat.declining} giảm</span>
+                                                    </div>
+                                                    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
+                                                        <div
+                                                            className="h-full bg-emerald-500 transition-all duration-500"
+                                                            style={{ width: `${breadthPercent}%` }}
+                                                        />
+                                                        <div
+                                                            className="h-full bg-rose-500 transition-all duration-500"
+                                                            style={{ width: `${100 - breadthPercent}%` }}
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
