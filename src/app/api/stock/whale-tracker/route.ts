@@ -3,6 +3,8 @@ import { fetchForeignTrades, fetchStockHistory } from '@/lib/stock-api';
 import { getWithCache } from '@/lib/cache';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol')?.toUpperCase();
@@ -31,10 +33,13 @@ export async function GET(request: Request) {
             try {
                 const now = new Date();
                 const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                // Use ISO format to avoid locale-dependent date formatting
+                const startStr = `${thirtyDaysAgo.getDate()}/${thirtyDaysAgo.getMonth() + 1}/${thirtyDaysAgo.getFullYear()}`;
+                const endStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
                 priceHistory = await fetchStockHistory({
                     symbol,
-                    startDate: thirtyDaysAgo.toLocaleDateString('vi-VN'),
-                    endDate: now.toLocaleDateString('vi-VN')
+                    startDate: startStr,
+                    endDate: endStr
                 });
             } catch (e) {
                 console.warn(`[WhaleTracker] Failed to fetch history for ${symbol}:`, e);
@@ -99,8 +104,8 @@ Tập trung vào Whale nếu có, hoặc tập trung vào VSA (Vol/Price) nếu 
 Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
 
                     const genAI = new GoogleGenerativeAI(apiKey.trim());
-                    // Try flash first, then pro as fallback if flash is restricted
-                    const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-pro'];
+                    // Use latest Gemini models
+                    const modelsToTry = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
                     let lastError = '';
 
                     for (const modelName of modelsToTry) {
@@ -121,10 +126,24 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                     }
                 } catch (aiErr: any) {
                     console.error('AI Insight Error:', aiErr.message);
-                    aiInsight = `Lỗi kết nối AI (403/Expired): Vui lòng kiểm tra lại Key hoặc bật 'Generative Language API' trong AI Studio. Chi tiết: ${aiErr.message}`;
+                    aiInsight = `Lỗi kết nối AI: Vui lòng kiểm tra lại API Key hoặc bật 'Generative Language API'. Chi tiết: ${aiErr.message}`;
                 }
             } else {
-                aiInsight = 'Vui lòng cấu hình API Key để kích hoạt Chiến lược Cá mập (AI).';
+                // Smart algorithmic fallback when no Gemini key
+                if (hasTrades) {
+                    const recentTrend = recentNetValue > 0 ? 'mua ròng' : 'bán ròng';
+                    const totalTrend = netValueTotal > 0 ? 'tích lũy' : 'phân phối';
+                    const recentVND = Math.abs(recentNetValue / 1e9).toFixed(1);
+                    const totalVND = Math.abs(netValueTotal / 1e9).toFixed(1);
+                    aiInsight = `Khối ngoại ${recentTrend} ${recentVND} tỷ trong 5 phiên gần nhất. Tổng 30 phiên: ${totalTrend} ${totalVND} tỷ. ${netValueTotal > 0 ? 'Dòng tiền ngoại đang ủng hộ.' : 'Áp lực bán từ khối ngoại cần theo dõi.'}`;
+                } else if (priceHistory.length > 0) {
+                    const latest = priceHistory[priceHistory.length - 1];
+                    const prev = priceHistory.length > 5 ? priceHistory[priceHistory.length - 6] : priceHistory[0];
+                    const priceChange = ((Number(latest.close) - Number(prev.close)) / Number(prev.close) * 100).toFixed(1);
+                    aiInsight = `Cổ phiếu ${Number(priceChange) > 0 ? 'tăng' : 'giảm'} ${Math.abs(Number(priceChange))}% trong 5 phiên. Dữ liệu Whale tạm ngắt. Cài đặt API Key để xem phân tích AI chi tiết.`;
+                } else {
+                    aiInsight = 'Cài đặt Google Gemini API Key để kích hoạt phân tích chiến lược AI. Vào AI Brain Settings để cấu hình.';
+                }
             }
 
             // Comprehensive Recommendation Matrix

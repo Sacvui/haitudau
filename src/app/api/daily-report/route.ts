@@ -160,10 +160,11 @@ async function rankVN30(): Promise<StockSnapshot[]> {
 async function generateAnalysis(
     stock1: StockSnapshot,
     stock2: StockSnapshot,
-    allStocks: StockSnapshot[]
+    allStocks: StockSnapshot[],
+    userGeminiKey?: string | null
 ): Promise<{ market_summary: string; analysis_1: string; analysis_2: string }> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+    const apiKey = userGeminiKey || process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY not configured. Cài đặt API key trong Cấu hình AI hoặc biến môi trường.');
 
     const today = new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -308,14 +309,18 @@ async function storeReport(
 
 // ── MAIN HANDLER ──
 export async function GET(request: NextRequest) {
-    // Security: only allow Vercel Cron or manual trigger with key
+    // Security: allow Vercel Cron, manual trigger, or localhost/development
     const authHeader = request.headers.get('authorization');
     const isVercelCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
     const isManualTrigger = request.nextUrl.searchParams.get('key') === process.env.GEMINI_API_KEY?.slice(0, 10);
+    // BYOK: User's own Gemini key takes priority
+    const userGeminiKey = request.headers.get('x-gemini-key');
+    const hasUserKey = !!userGeminiKey;
 
-    // Allow in development or with proper auth
+    // Allow in development, with proper auth, or with user's own key
     const isDev = process.env.NODE_ENV === 'development';
-    if (!isDev && !isVercelCron && !isManualTrigger) {
+    const isLocalhost = request.url.includes('localhost') || request.url.includes('127.0.0.1');
+    if (!isDev && !isLocalhost && !isVercelCron && !isManualTrigger && !hasUserKey) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -346,7 +351,7 @@ export async function GET(request: NextRequest) {
 
         // Step 3: Generate AI analysis
         console.log('[DailyReport] Calling Gemini AI...');
-        const analysis = await generateAnalysis(pick1, pick2, ranked);
+        const analysis = await generateAnalysis(pick1, pick2, ranked, userGeminiKey);
         console.log('[DailyReport] Gemini analysis complete.');
 
         // Step 4: Store to Supabase

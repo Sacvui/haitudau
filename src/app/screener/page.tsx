@@ -118,6 +118,9 @@ export default function DividendScreenerPage() {
     const [authPassword, setAuthPassword] = useState('');
     const [authError, setAuthError] = useState('');
     const [pendingGroup, setPendingGroup] = useState<'vn100' | 'top20' | null>(null);
+    const [loginLoading, setLoginLoading] = useState(false);
+    const [userPermissions, setUserPermissions] = useState<{ vn100: boolean; top20: boolean }>({ vn100: false, top20: false });
+    const [userName, setUserName] = useState('');
 
     const [stocks, setStocks] = useState<StockDividendData[]>([]);
     const [sectorStats, setSectorStats] = useState<SectorStat[]>([]);
@@ -166,29 +169,75 @@ export default function DividendScreenerPage() {
         }
     }, [activeTab, selectedGroup, fetchData, stocks.length]);
 
+    // Check existing session on mount
+    useEffect(() => {
+        fetch('/api/auth/me').then(r => r.json()).then(data => {
+            if (data.authenticated && data.user) {
+                setIsAuthenticated(true);
+                setUserPermissions(data.user.permissions || { vn100: false, top20: false });
+                setUserName(data.user.displayName || data.user.username);
+            }
+        }).catch(() => { });
+    }, []);
+
     const handleGroupChange = (group: 'vn30' | 'vn100' | 'top20') => {
-        if (group !== 'vn30' && !isAuthenticated) {
-            setPendingGroup(group);
-            setShowAuthModal(true);
-            return;
+        if (group !== 'vn30') {
+            if (!isAuthenticated) {
+                setPendingGroup(group);
+                setShowAuthModal(true);
+                return;
+            }
+            // Check specific permission
+            if (group === 'vn100' && !userPermissions.vn100) {
+                setAuthError('Bạn không có quyền truy cập VN100. Liên hệ Admin.');
+                setShowAuthModal(true);
+                return;
+            }
+            if (group === 'top20' && !userPermissions.top20) {
+                setAuthError('Bạn không có quyền truy cập Top 20. Liên hệ Admin.');
+                setShowAuthModal(true);
+                return;
+            }
         }
         setStocks([]); // clear old data to trigger loading UI
         setSelectedGroup(group);
     };
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (authUsername === 'HaiLP' && authPassword === 'DautuTudau') {
-            setIsAuthenticated(true);
-            setShowAuthModal(false);
-            setAuthError('');
-            if (pendingGroup) {
-                setSelectedGroup(pendingGroup);
-                setStocks([]);
-                setPendingGroup(null);
+        setLoginLoading(true);
+        setAuthError('');
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: authUsername, password: authPassword }),
+            });
+            const data = await res.json();
+            if (data.success && data.user) {
+                setIsAuthenticated(true);
+                setUserPermissions(data.user.permissions || { vn100: false, top20: false });
+                setUserName(data.user.displayName || data.user.username);
+                setShowAuthModal(false);
+                setAuthError('');
+                if (pendingGroup) {
+                    const perm = pendingGroup === 'vn100' ? data.user.permissions?.vn100 : data.user.permissions?.top20;
+                    if (perm) {
+                        setSelectedGroup(pendingGroup);
+                        setStocks([]);
+                    } else {
+                        setAuthError(`Bạn không có quyền truy cập ${pendingGroup === 'vn100' ? 'VN100' : 'Top 20'}. Liên hệ Admin.`);
+                        setShowAuthModal(true);
+                    }
+                    setPendingGroup(null);
+                }
+            } else {
+                setAuthError(data.error || 'Sai tên đăng nhập hoặc mật khẩu!');
             }
-        } else {
-            setAuthError('Sai tên đăng nhập hoặc mật khẩu!');
+        } catch {
+            setAuthError('Lỗi kết nối server');
+        } finally {
+            setLoginLoading(false);
         }
     };
 

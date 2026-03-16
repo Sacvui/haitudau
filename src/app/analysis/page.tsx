@@ -8,6 +8,7 @@ import {
     CheckCircle, Loader2, Menu, Newspaper, BarChart3, RefreshCw,
     Minus, Clock, Sparkles, ArrowUp, ArrowDown
 } from 'lucide-react';
+import { getStoredApiKey } from '@/components/ApiKeySettings';
 
 interface DailyReport {
     report_date: string;
@@ -45,11 +46,25 @@ export default function AnalysisPage() {
         setLoading(true);
         setError(null);
         try {
+            // Try localStorage cache first
+            const cachedReport = localStorage.getItem('daily_report_cache');
+            if (cachedReport) {
+                try {
+                    const cached = JSON.parse(cachedReport);
+                    // Use cached if less than 6 hours old
+                    if (cached && cached.report_date && (Date.now() - new Date(cached.created_at).getTime()) < 6 * 60 * 60 * 1000) {
+                        setReport(cached);
+                        setLoading(false);
+                        return;
+                    }
+                } catch { }
+            }
+
             // Try to fetch from Supabase
             const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
             const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-            if (supabaseUrl && supabaseKey) {
+            if (supabaseUrl && supabaseKey && supabaseUrl.length > 5) {
                 const res = await fetch(
                     `${supabaseUrl}/rest/v1/daily_reports?order=report_date.desc&limit=1`,
                     {
@@ -68,7 +83,9 @@ export default function AnalysisPage() {
                     }
                 }
             }
-            setError('Chưa có báo cáo nào. Bấm "Tạo Báo Cáo" để khởi chạy phân tích AI.');
+
+            // No Supabase and no cache — show prompt
+            setError('Ch\u01b0a c\u00f3 b\u00e1o c\u00e1o n\u00e0o. B\u1ea5m "T\u1ea1o B\u00e1o C\u00e1o" \u0111\u1ec3 kh\u1edfi ch\u1ea1y ph\u00e2n t\u00edch AI (c\u1ea7n Gemini API Key).');
         } catch (err) {
             setError('Không thể tải báo cáo. Kiểm tra kết nối.');
         } finally {
@@ -81,28 +98,35 @@ export default function AnalysisPage() {
         setGenerating(true);
         setError(null);
         try {
-            const res = await fetch('/api/daily-report?key=' + (process.env.NEXT_PUBLIC_GEMINI_KEY_PREFIX || ''));
+            const userKey = getStoredApiKey();
+            const headers: Record<string, string> = {};
+            if (userKey) headers['x-gemini-key'] = userKey;
+
+            const res = await fetch('/api/daily-report?key=' + (process.env.NEXT_PUBLIC_GEMINI_KEY_PREFIX || ''), { headers });
             const data = await res.json();
 
             if (res.ok && !data.error) {
                 // Convert API response to DailyReport DB format for UI consistency
-                setReport({
+                const reportData: DailyReport = {
                     report_date: new Date().toISOString().split('T')[0],
                     symbol_1: data.raw?.stock1?.symbol || data.top5?.[0]?.symbol || '',
                     symbol_2: data.raw?.stock2?.symbol || data.top5?.[1]?.symbol || '',
-                    market_summary: data.market_summary || 'Không có dữ liệu',
+                    market_summary: data.market_summary || 'Kh\u00f4ng c\u00f3 d\u1eef li\u1ec7u',
                     analysis_1: data.analysis_1 || 'Không có dữ liệu',
                     analysis_2: data.analysis_2 || 'Không có dữ liệu',
                     signal_1: data.raw?.stock1?.signal || 'HOLD',
                     signal_2: data.raw?.stock2?.signal || 'HOLD',
                     raw_data: data.raw || { stock1: data.top5?.[0], stock2: data.top5?.[1] },
                     created_at: new Date().toISOString(),
-                });
+                };
+                setReport(reportData);
+                // Cache to localStorage
+                try { localStorage.setItem('daily_report_cache', JSON.stringify(reportData)); } catch { }
             } else {
-                setError(data.error || 'Server trả về lỗi không xác định.');
+                setError(data.error || 'Server tr\u1ea3 v\u1ec1 l\u1ed7i kh\u00f4ng x\u00e1c \u0111\u1ecbnh.');
             }
         } catch (err: any) {
-            setError(err.message || 'Lỗi khi kết nối đến AI Server.');
+            setError(err.message || 'L\u1ed7i khi k\u1ebft n\u1ed1i \u0111\u1ebfn AI Server.');
         } finally {
             setGenerating(false);
         }
