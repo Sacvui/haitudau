@@ -21,12 +21,30 @@ const VN100_SYMBOLS = [
     'VCG', 'VCI', 'VGC', 'VHC', 'VIX', 'VND', 'VPI', 'VSH'
 ];
 
-// Helper: Calculate consistency score (1-5) based on dividend history
+// Helper: Calculate consistency score (1-5) based on dividend history quality
 function calculateConsistency(history: any[]): number {
     if (!history || history.length === 0) return 0;
-    const years = history.length;
-    let score = Math.min(5, years);
-    return score;
+    const cashDivs = history.filter((d: any) => d.type === 'cash');
+    if (cashDivs.length === 0) return 0;
+
+    // 1. Years of payout (max 3 pts)
+    let score = Math.min(3, cashDivs.length);
+
+    // 2. Dividend growth: compare last 2 cash dividends
+    if (cashDivs.length >= 2) {
+        const sorted = [...cashDivs].sort((a: any, b: any) => {
+            const yearA = a.exDate ? new Date(a.exDate).getFullYear() : 0;
+            const yearB = b.exDate ? new Date(b.exDate).getFullYear() : 0;
+            return yearB - yearA;
+        });
+        if (sorted[0].value >= sorted[1].value) score += 1; // Growing or stable
+    }
+
+    // 3. Average dividend value above threshold (proxy for yield quality)
+    const avgDiv = cashDivs.reduce((sum: number, d: any) => sum + (d.value || 0), 0) / cashDivs.length;
+    if (avgDiv >= 1000) score += 1; // >= 1000 VND per share is decent
+
+    return Math.min(5, score);
 }
 
 // Top 20 Recommended by Hai (Curated High-Quality Fundamental Stocks)
@@ -79,7 +97,7 @@ export async function GET(request: NextRequest) {
 
         let targetSymbols = VN30_SYMBOLS;
         if (group === 'vn100') targetSymbols = VN100_SYMBOLS;
-        if (group === 'top20') targetSymbols = TOP20_SYMBOLS;
+        if (group === 'top20') targetSymbols = VN100_SYMBOLS; // Score all VN100, then pick top 20
 
         // 1. Fetch Realtime Prices from SSI in chunks to avoid URL length limits
         // Using SSI Scoreboard API
@@ -338,9 +356,38 @@ export async function GET(request: NextRequest) {
             return b.averageChange - a.averageChange;
         });
 
+        // --- DYNAMIC TOP 20 SCORING ---
+        // When group=top20, score stocks with a Multi-Factor Model and return the best 20
+        let outputData = finalData;
+        if (group === 'top20') {
+            const scored = finalData.map(stock => {
+                // Normalize each factor to 0-10 scale
+                const yieldScore = Math.min(10, stock.dividendYield * 1.5); // 6.67% yield = 10 pts
+                const consistencyPts = stock.consistencyScore * 2; // max 5 × 2 = 10
+                const momentumPts = Math.min(10, Math.max(0, (stock.changePercent + 3) * 1.67)); // -3% to +3% → 0-10
+                const flowPts = Math.min(10, stock.volumeRatio * 5); // 2x volume = 10 pts
+                const margin = stock.intrinsicValue > 0 && stock.currentPrice > 0
+                    ? ((stock.intrinsicValue - stock.currentPrice) / stock.currentPrice) * 100
+                    : 0;
+                const marginPts = Math.min(10, Math.max(0, (margin + 20) * 0.5)); // -20% to +20% → 0-10
+
+                const compositeScore =
+                    yieldScore * 0.25 +
+                    consistencyPts * 0.25 +
+                    momentumPts * 0.20 +
+                    flowPts * 0.15 +
+                    marginPts * 0.15;
+
+                return { ...stock, compositeScore };
+            });
+
+            scored.sort((a, b) => b.compositeScore - a.compositeScore);
+            outputData = scored.slice(0, 20);
+        }
+
         return NextResponse.json({
             success: true,
-            data: finalData,
+            data: outputData,
             sectorStats
         });
 

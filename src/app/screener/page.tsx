@@ -72,16 +72,38 @@ interface SectorStat {
 
 type SortField = 'dividendYield' | 'consistencyScore' | 'stockDividendRatio' | 'marketCap' | 'symbol' | 'shortTermRec' | 'longTermRec' | 'volumeRatio' | 'intrinsicValue';
 
-// Recommendations Scoring Helpers (for sorting)
+// Recommendations Scoring Helpers (Multi-Factor, for sorting and display)
 const getShortTermScore = (stock: StockDividendData) => {
-    if (stock.changePercent >= 1.5) return 3; // TÍCH CỰC
-    if (stock.changePercent <= -1.5) return 1; // TIÊU CỰC
+    // Multi-factor: Momentum (30%) + Smart Flow (40%) + Intrinsic Margin (30%)
+    const momentumPts = stock.changePercent >= 1.5 ? 3 : (stock.changePercent <= -1.5 ? 1 : 2);
+    const flowPts = stock.volumeRatio >= 1.5 ? 3 : (stock.volumeRatio < 0.8 ? 1 : 2);
+    const margin = stock.intrinsicValue > 0 && stock.currentPrice > 0
+        ? ((stock.intrinsicValue - stock.currentPrice) / stock.currentPrice) * 100
+        : 0;
+    const marginPts = margin > 5 ? 3 : (margin < -10 ? 1 : 2);
+
+    const score = momentumPts * 0.3 + flowPts * 0.4 + marginPts * 0.3;
+    if (score >= 2.4) return 3; // TÍCH CỰC
+    if (score <= 1.5) return 1; // TIÊU CỰC
     return 2; // TRUNG LẬP
 };
 
 const getLongTermScore = (stock: StockDividendData) => {
-    if (stock.consistencyScore >= 4 && stock.dividendYield >= 5) return 3; // MUA
-    if (stock.consistencyScore >= 3 || stock.dividendYield >= 3) return 2; // NẮM GIỮ
+    // Multi-factor: Consistency (25%) + Yield (25%) + Sector Growth (25%) + Intrinsic Margin (25%)
+    const consistencyPts = stock.consistencyScore >= 4 ? 3 : (stock.consistencyScore >= 2 ? 2 : 1);
+    const yieldPts = stock.dividendYield >= 5 ? 3 : (stock.dividendYield >= 2 ? 2 : 1);
+
+    const growthSectors = ['Công nghệ', 'Bán lẻ', 'Hóa chất', 'Thép'];
+    const sectorPts = growthSectors.includes(stock.sector) ? 3 : 2;
+
+    const margin = stock.intrinsicValue > 0 && stock.currentPrice > 0
+        ? ((stock.intrinsicValue - stock.currentPrice) / stock.currentPrice) * 100
+        : 0;
+    const marginPts = margin > 5 ? 3 : (margin < -10 ? 1 : 2);
+
+    const score = consistencyPts * 0.25 + yieldPts * 0.25 + sectorPts * 0.25 + marginPts * 0.25;
+    if (score >= 2.5) return 3; // MUA
+    if (score >= 1.8) return 2; // NẮM GIỮ
     return 1; // ĐỨNG NGOÀI
 };
 

@@ -104,8 +104,8 @@ Tập trung vào Whale nếu có, hoặc tập trung vào VSA (Vol/Price) nếu 
 Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
 
                     const genAI = new GoogleGenerativeAI(apiKey.trim());
-                    // Use latest Gemini models (v3.1)
-                    const modelsToTry = ['gemini-3.1-flash', 'gemini-3-flash', 'gemini-3.1-pro'];
+                    // Use latest Gemini models (2025-2026)
+                    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash'];
                     let lastError = '';
 
                     for (const modelName of modelsToTry) {
