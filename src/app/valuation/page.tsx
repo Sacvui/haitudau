@@ -835,6 +835,27 @@ function SummaryCard({ valuation, fundamentals }: { valuation: ValuationSummary;
                                 {valuation.overallMargin.toFixed(1)}%
                             </p>
                         </div>
+                        <div className="text-center pl-6 border-l border-white/10">
+                            <p className="text-[10px] text-slate-500 uppercase font-bold">Độ tin cậy</p>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-xl font-black ${
+                                    valuation.convictionScore >= 80 ? 'text-emerald-400' :
+                                    valuation.convictionScore >= 60 ? 'text-sky-400' :
+                                    valuation.convictionScore >= 40 ? 'text-amber-400' :
+                                    'text-rose-400'
+                                }`}>
+                                    {valuation.convictionScore}%
+                                </span>
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${
+                                    valuation.convergenceGrade === 'S' ? 'bg-amber-400 text-black' :
+                                    valuation.convergenceGrade === 'A' ? 'bg-emerald-500 text-white' :
+                                    valuation.convergenceGrade === 'B' ? 'bg-sky-500 text-white' :
+                                    'bg-slate-700 text-slate-300'
+                                }`}>
+                                    {valuation.convergenceGrade}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </CardContent>

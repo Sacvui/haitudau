@@ -37,6 +37,8 @@ export interface ValuationSummary {
     overallVerdict: 'CHEAP' | 'FAIR' | 'EXPENSIVE';
     results: ValuationResult[];
     marketSentimentScore?: number;
+    convictionScore: number;    // 0-100%
+    convergenceGrade: string;   // S, A, B, C, D
 }
 
 // ===================== CORE METHODS =====================
@@ -379,12 +381,44 @@ export function runFullValuation(
 
     const overallMos = calculateMarginOfSafety(weightedAvg, input.currentPrice, sentimentScore);
 
+    // ===================== CONVICTION CALCULATION =====================
+    // 1. Convergence: How much do the models agree?
+    let convergenceScore = 0;
+    let grade = 'C';
+    if (adjustedResults.length >= 2) {
+        const values = adjustedResults.map(r => r.intrinsicValue);
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        const squareDiffs = values.map(v => Math.pow(v - avg, 2));
+        const stdDev = Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / values.length);
+        const cv = stdDev / avg; // Coefficient of Variation
+
+        // CV < 10% = S, < 20% = A, < 35% = B, < 50% = C, > 50% = D
+        if (cv < 0.1) { convergenceScore = 100; grade = 'S'; }
+        else if (cv < 0.2) { convergenceScore = 85; grade = 'A'; }
+        else if (cv < 0.35) { convergenceScore = 70; grade = 'B'; }
+        else if (cv < 0.5) { convergenceScore = 50; grade = 'C'; }
+        else { convergenceScore = 30; grade = 'D'; }
+    }
+
+    // 2. Data Quality: ROE + Consistency
+    const qualityScore = Math.min(100, (input.roe || 0) * 3 + (input.dividendYield || 0) * 5);
+
+    // 3. Model Strength: How many reliable models did we use?
+    const modelStrength = Math.min(100, adjustedResults.length * 25);
+
+    // Final Conviction Score: 40% Convergence + 30% Quality + 30% Model Strength
+    const convictionScore = Math.round(
+        (convergenceScore * 0.4) + (qualityScore * 0.3) + (modelStrength * 0.3)
+    );
+
     return {
         averageIntrinsic: weightedAvg,
         currentPrice: input.currentPrice,
         overallMargin: overallMos.margin,
         overallVerdict: overallMos.verdict === 'N/A' ? 'FAIR' : overallMos.verdict,
         results,
-        marketSentimentScore: sentimentScore
+        marketSentimentScore: sentimentScore,
+        convictionScore: Math.min(100, Math.max(0, convictionScore)),
+        convergenceGrade: grade
     };
 }
