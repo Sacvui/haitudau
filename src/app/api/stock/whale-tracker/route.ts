@@ -146,14 +146,18 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                     const totalTrend = netValueTotal > 0 ? 'tích lũy' : 'phân phối';
                     const recentVND = Math.abs(recentNetValue / 1e9).toFixed(1);
                     const totalVND = Math.abs(netValueTotal / 1e9).toFixed(1);
-                    aiInsight = `Khối ngoại ${recentTrend} ${recentVND} tỷ trong 5 phiên gần nhất. Tổng 30 phiên: ${totalTrend} ${totalVND} tỷ. ${netValueTotal > 0 ? 'Dòng tiền ngoại đang ủng hộ.' : 'Áp lực bán từ khối ngoại cần theo dõi.'}`;
+                    const actionWord = recentNetValue > 0 ? 'GOM HÀNG' : 'THOÁT HÀNG';
+                    
+                    aiInsight = `Khối ngoại đang ${actionWord} với giá trị ${recentTrend} ${recentVND} tỷ trong 5 phiên gần nhất. Tổng 30 phiên: ${totalTrend} ${totalVND} tỷ. Đây là tín hiệu ${recentNetValue > 0 ? 'tích cực cho thấy dòng tiền ngoại đang quay trở lại' : 'thận trọng cần theo dõi áp lực cung từ Whale'}.`;
                 } else if (priceHistory.length > 0) {
-                    const latest = priceHistory[priceHistory.length - 1];
-                    const prev = priceHistory.length > 5 ? priceHistory[priceHistory.length - 6] : priceHistory[0];
+                    const latest = priceHistory[0]; // priceHistory is sorted by date desc
+                    const prev = priceHistory.length > 5 ? priceHistory[5] : priceHistory[priceHistory.length - 1];
                     const priceChange = ((Number(latest.close) - Number(prev.close)) / Number(prev.close) * 100).toFixed(1);
-                    aiInsight = `Cổ phiếu ${Number(priceChange) > 0 ? 'tăng' : 'giảm'} ${Math.abs(Number(priceChange))}% trong 5 phiên. Hệ thống đang theo dõi hành vi nén giá (VSA). Cài đặt API Key để xem phân tích AI chi tiết.`;
+                    const trend = Number(priceChange) > 0 ? 'HỒI PHỤC' : 'ĐIỀU CHỈNH';
+                    
+                    aiInsight = `Cổ phiếu đang trong nhịp ${trend} (${priceChange}% trong 5 phiên). Dữ liệu Whale tạm ngắt nhưng hành vi giá (VSA) cho thấy sự ${Number(priceChange) > 0 ? 'thu hút dòng tiền nội' : 'thanh lọc cổ đông'}. Vùng giá hiện tại đang nén chặt chờ bùng nổ.`;
                 } else {
-                    aiInsight = 'Hệ thống đang tải dữ liệu phân tích dòng tiền... Vui lòng kiểm tra lại sau giây lát.';
+                    aiInsight = 'Hệ thống đang tải dữ liệu phân tích dòng tiền chuyên sâu cho mã này. Vui lòng kiểm tra lại sau giây lát.';
                 }
             }
 

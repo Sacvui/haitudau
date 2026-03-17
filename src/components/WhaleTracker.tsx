@@ -149,16 +149,22 @@ export default function WhaleTracker({ initialSymbol = 'VIB', valuationVerdict }
                                 </div>
                                 <p className="text-lg font-black text-white uppercase tracking-tight">
                                     {data.symbol === 'VIB' ? '28.x - 30.x' : 
-                                     data.symbol === 'FPT' ? '180.x - 200.x' : 
-                                     data.symbol === 'FRT' ? '220.x - 240.x' : 
-                                     data.symbol === 'VNM' ? '82.x - 88.x' :
-                                     data.symbol === 'MSN' ? '95.x - 110.x' :
-                                     data.symbol === 'HPG' ? '40.x - 45.x' :
+                                     data.symbol === 'FPT' ? '180.x - 210.x' : 
+                                     data.symbol === 'FRT' ? '220.x - 250.x' : 
+                                     data.symbol === 'VNM' ? '85.x - 92.x' :
+                                     data.symbol === 'TCB' ? '68.x - 75.x' :
+                                     data.symbol === 'MBB' ? '35.x - 40.x' :
+                                     data.symbol === 'ACB' ? '38.x - 42.x' :
+                                     data.symbol === 'VCB' ? '125.x - 145.x' :
+                                     data.symbol === 'MWG' ? '90.x - 110.x' :
+                                     data.symbol === 'HPG' ? '42.x - 48.x' :
+                                     data.symbol === 'MSN' ? '105.x - 120.x' :
+                                     data.symbol === 'SSI' ? '48.x - 55.x' :
                                      (() => {
                                         const currentPrice = data.latestPrice || 0;
                                         if (currentPrice > 0) {
-                                            const low = Math.round((currentPrice * 1.2) / 100) / 10;
-                                            const high = Math.round((currentPrice * 1.5) / 100) / 10;
+                                            const low = Math.round((currentPrice * 1.25) / 100) / 10;
+                                            const high = Math.round((currentPrice * 1.55) / 100) / 10;
                                             return `${low.toFixed(1)}x - ${high.toFixed(1)}x`;
                                         }
                                         return valuationVerdict === 'CHEAP' ? 'HỒI PHỤC' : 'TĂNG TRƯỞNG';

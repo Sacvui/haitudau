@@ -47,13 +47,14 @@ export const SECTOR_MAP: Record<string, string> = {
     'ACB': 'Ngân hàng', 'BID': 'Ngân hàng', 'CTG': 'Ngân hàng', 'HDB': 'Ngân hàng',
     'MBB': 'Ngân hàng', 'SHB': 'Ngân hàng', 'SSB': 'Ngân hàng', 'STB': 'Ngân hàng',
     'TCB': 'Ngân hàng', 'TPB': 'Ngân hàng', 'VCB': 'Ngân hàng', 'VIB': 'Ngân hàng',
-    'VPB': 'Ngân hàng', 'BVH': 'Bảo hiểm', 'SSI': 'Chứng khoán',
-    'FPT': 'Công nghệ', 'MWG': 'Bán lẻ', 'PNJ': 'Bán lẻ',
-    'GAS': 'Dầu khí', 'PLX': 'Dầu khí', 'POW': 'Điện',
-    'HPG': 'Thép', 'MSN': 'Tiêu dùng', 'SAB': 'Tiêu dùng', 'VNM': 'Tiêu dùng',
-    'BCM': 'Bất động sản', 'GVR': 'Cao su', 'VHM': 'Bất động sản',
-    'VIC': 'Bất động sản', 'VRE': 'Bất động sản', 'VJC': 'Hàng không', 'DGC': 'Hóa chất',
-    'FRT': 'Bán lẻ', 'CTR': 'Viễn thông', 'VGI': 'Công nghệ'
+    'VPB': 'Ngân hàng', 'BVH': 'Bảo hiểm', 'SSI': 'Chứng khoán', 'VND': 'Chứng khoán', 'VCI': 'Chứng khoán',
+    'FPT': 'Công nghệ', 'MWG': 'Bán lẻ', 'PNJ': 'Bán lẻ', 'FRT': 'Bán lẻ', 'DGW': 'Bán lẻ',
+    'GAS': 'Dầu khí', 'PLX': 'Dầu khí', 'POW': 'Điện', 'REE': 'Điện', 'PC1': 'Điện',
+    'HPG': 'Thép', 'HSG': 'Thép', 'NKG': 'Thép',
+    'MSN': 'Tiêu dùng', 'SAB': 'Tiêu dùng', 'VNM': 'Tiêu dùng', 'KDC': 'Tiêu dùng',
+    'BCM': 'Bất động sản', 'GVR': 'Cao su', 'VHM': 'Bất động sản', 'DXG': 'Bất động sản', 'PDR': 'Bất động sản', 'NLG': 'Bất động sản',
+    'VIC': 'Bất động sản', 'VRE': 'Bất động sản', 'VJC': 'Hàng không', 'HVN': 'Hàng không', 'DGC': 'Hóa chất',
+    'CTR': 'Viễn thông', 'VGI': 'Công nghệ'
 };
 
 export const VN30_BASE_RATIOS: Record<string, { pe: number, pb: number, roe: number, name?: string }> = {
@@ -64,7 +65,12 @@ export const VN30_BASE_RATIOS: Record<string, { pe: number, pb: number, roe: num
     'CTG': { pe: 7.5, pb: 1.2, roe: 15, name: 'VietinBank' },
     'BID': { pe: 10, pb: 1.8, roe: 16, name: 'BIDV' },
     'VCB': { pe: 14, pb: 2.8, roe: 20, name: 'Vietcombank' },
-    'FPT': { pe: 24, pb: 6.0, roe: 28, name: 'FPT Corp' }, // Updated for high valuation
+    'STB': { pe: 8.0, pb: 1.1, roe: 18, name: 'Sacombank' },
+    'TPB': { pe: 7.0, pb: 1.0, roe: 15, name: 'TPBank' },
+    'VPB': { pe: 8.5, pb: 1.0, roe: 13, name: 'VPBank' },
+    'HDB': { pe: 6.5, pb: 1.3, roe: 23, name: 'HDBank' },
+    'SHB': { pe: 5.0, pb: 0.7, roe: 14, name: 'SHB' },
+    'FPT': { pe: 24, pb: 6.0, roe: 28, name: 'FPT Corp' },
     'HPG': { pe: 14, pb: 1.6, roe: 12, name: 'Hòa Phát' },
     'MWG': { pe: 25, pb: 2.5, roe: 10, name: 'Thế giới Di động' },
     'VNM': { pe: 16, pb: 4.5, roe: 28, name: 'Vinamilk' },
@@ -77,7 +83,14 @@ export const VN30_BASE_RATIOS: Record<string, { pe: number, pb: number, roe: num
     'MSN': { pe: 20, pb: 3.5, roe: 18, name: 'Masan Group' },
     'DGC': { pe: 12, pb: 3.0, roe: 35, name: 'Hóa chất Đức Giang' },
     'VCI': { pe: 18, pb: 1.9, roe: 12, name: 'Chứng khoán Vietcap' },
-    'FRT': { pe: 45, pb: 5.0, roe: 8, name: 'Bán lẻ FPT (Long Châu)' }
+    'FRT': { pe: 45, pb: 5.0, roe: 8, name: 'Bán lẻ FPT (Long Châu)' },
+    'BVH': { pe: 12, pb: 1.1, roe: 10, name: 'Bảo Việt' },
+    'PLX': { pe: 14, pb: 1.5, roe: 12, name: 'Petrolimex' },
+    'POW': { pe: 15, pb: 0.8, roe: 5, name: 'PV Power' },
+    'SAB': { pe: 18, pb: 3.0, roe: 18, name: 'Sabeco' },
+    'GVR': { pe: 25, pb: 2.5, roe: 10, name: 'Tập đoàn Cao su' },
+    'BCM': { pe: 25, pb: 3.5, roe: 15, name: 'Becamex IDC' },
+    'VJC': { pe: 20, pb: 3.0, roe: 10, name: 'Vietjet Air' }
 };
 
 // ===================== CORE METHODS =====================
@@ -234,20 +247,32 @@ export function runFullValuation(
     }
 ): ValuationSummary {
     const sentimentScore = customParams?.marketSentimentScore ?? 50;
-    const isBank = input.industry === 'Ngân hàng' || input.bvps > input.eps * 6;
-    const isGrowth = input.industry === 'Công nghệ' || (input.pe > 15 && input.roe > 15);
     
-    let sectorCalibration = `Hệ máy tự động hiệu chuẩn cho nhóm ${input.industry || 'Chung'}.`;
-    if (isBank) sectorCalibration = "⚠️ Hiệu chuẩn NH: Chặn trần Graham & DCF bảo thủ, ưu tiên Giá trị Sổ sách và Cổ tức.";
-    if (isGrowth) sectorCalibration = "🚀 Hiệu chuẩn Tech: Ưu tiên Tăng trưởng kép & DCF, hạ trọng số Ben Graham.";
+    // Sector Flags
+    const isBank = input.industry === 'Ngân hàng' || input.bvps > input.eps * 6;
+    const isTech = input.industry === 'Công nghệ';
+    const isRE = input.industry === 'Bất động sản';
+    const isGrowth = isTech || input.industry === 'Bán lẻ' || (input.roe > 20 && input.pe > 20);
 
-    let baseReturn = (customParams?.requiredReturn || 12) / 100;
-    if (isBank) baseReturn = 0.11;
-    if (isGrowth) baseReturn = 0.13;
+    // Dynamic Parameters
+    let baseReturn = (customParams?.requiredReturn ?? 12) / 100;
+    let growthCap = isGrowth ? 25 : 18;
+    let growthRetention = isBank ? 0.4 : 0.6;
+    let sectorCalibration = isBank ? '🏦 Bank Mode (P/B Focus)' : isTech ? '🚀 Tech Growth Mode' : isRE ? '🏗️ Real Estate (Asset Focus)' : '📊 Standard Mode';
+
+    // Sector-specific adjustments
+    if (isBank) {
+        baseReturn = 0.11; // Banks usually have lower cost of equity in VN
+        growthCap = 15;
+    } else if (isTech) {
+        baseReturn = 0.13; // High risk, high reward
+        growthCap = 30;
+    } else if (isRE) {
+        baseReturn = 0.14; // High risk sector
+        growthCap = 12;
+    }
 
     const requiredReturn = baseReturn;
-    const growthCap = isGrowth ? 25 : 18;
-    const growthRetention = isBank ? 0.4 : 0.6;
     const calculatedGrowth = input.roe ? Math.min(input.roe * growthRetention, growthCap) : 10;
     const epsGrowth = (customParams?.epsGrowthRate ?? calculatedGrowth) / 100;
     const projYears = customParams?.projectionYears || 10;
