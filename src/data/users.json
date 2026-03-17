@@ -11,6 +11,18 @@
       },
       "displayName": "Hải LP",
       "createdAt": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "user-phatht",
+      "username": "phatht",
+      "passwordHash": "e86f78a8a3caf0b60d8e74e5942aa6dcc7dc150cd3c03338aef25b7d2d7e3ac",
+      "role": "user",
+      "permissions": {
+        "vn100": true,
+        "top20": true
+      },
+      "displayName": "Phát HT",
+      "createdAt": "2026-03-17T08:33:00Z"
     }
   ],
   "sessions": {}
