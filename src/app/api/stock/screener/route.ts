@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import { getWithCache } from '@/lib/cache';
+import { VN30_BASE_RATIOS, runSimpleValuation } from '@/lib/valuation-engine';
 import dividendsData from '@/data/dividends.json';
 
 // VN30 List (Full 30 stocks)
@@ -250,46 +252,27 @@ export async function GET(request: NextRequest) {
             const stockDividendRatio = lastStockDiv ? lastStockDiv.value / 100 : 0;
 
             // --- ALIGNED INTRINSIC VALUE COMPUTATION ---
-            // To prevent "Expensive but Hold" contradictions, we align Intrinsic Value
-            // directly with the momentum (volumeRatio) and consistency metrics that drive 
-            // the 'Hold/Buy' recommendations.
-
-            let intrinsicValue = currentPrice;
+            // We use the unified valuation engine to ensure consistency across the app.
+            // For the screener, we use the simple wrapper which infers missing details from baseline ratios.
+            
             const sector = getSector(symbol);
+            const baseData = VN30_BASE_RATIOS[symbol] || { pe: 12, pb: 1.5, roe: 15 };
+            const inferredEPS = currentPrice / baseData.pe;
+            const inferredBVPS = currentPrice / baseData.pb;
+            const inferredROE = baseData.roe;
 
-            // Base growth assumptions for sectors
-            const isHighGrowth = ['Công nghệ', 'Bán lẻ', 'Hóa chất'].includes(sector);
-            const isStableYield = ['Tiêu dùng', 'Điện', 'Bảo hiểm'].includes(sector);
+            const valuation = runSimpleValuation(
+                symbol,
+                currentPrice,
+                inferredEPS,
+                inferredROE,
+                inferredBVPS,
+                baseData.pe, // use its own PE as industryPE target for simplicity
+                dividendPerShare
+            );
 
+            let intrinsicValue = valuation.averageIntrinsic;
             const consistencyScore = calculateConsistency(divInfo);
-
-            if (dividendPerShare > 0) {
-                const requiredReturn = 0.12;
-                let assumedGrowth = isHighGrowth ? 0.08 : (isStableYield ? 0.04 : 0.03);
-
-                // Reward strong dividend history with higher growth projection
-                assumedGrowth += (consistencyScore - 3) * 0.01;
-
-                if (requiredReturn > assumedGrowth) {
-                    const ddmValue = (dividendPerShare * (1 + assumedGrowth)) / (requiredReturn - assumedGrowth);
-                    // Blend DDM with market price based on yield attractiveness
-                    const yieldPremium = dividendYield > 5 ? 1.2 : (dividendYield > 3 ? 1.05 : 0.9);
-                    intrinsicValue = (ddmValue * 0.4) + (currentPrice * yieldPremium * 0.6);
-                }
-            } else {
-                // Growth stocks without dividends (like early tech/retail)
-                const growthPremium = isHighGrowth ? 1.15 : 1.0;
-                // Reward stocks with strong volume momentum (Smart Flow)
-                const flowPremium = volumeRatio > 1.5 ? 1.1 : (volumeRatio < 0.8 ? 0.9 : 1.0);
-
-                // Align intrinsic value slightly above current price if metrics are good
-                intrinsicValue = currentPrice * growthPremium * flowPremium;
-            }
-
-            // Cap the intrinsic value to realistic bounds to prevent UI shocks
-            const lowerBound = currentPrice * 0.7; // Max -30% downside shown
-            const upperBound = currentPrice * 1.4; // Max +40% upside shown
-            intrinsicValue = Math.max(lowerBound, Math.min(intrinsicValue, upperBound));
 
             // Final Polish: If Long-Term/Short-Term Rec is "NẮM GIỮ" (Hold) hoặc "MUA" (Buy), ensure Margin >= -10% (Hợp lý)
             // This fixes the contradiction reported by the user.

@@ -34,8 +34,11 @@ export async function GET(request: Request) {
                 const now = new Date();
                 const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
                 // Use ISO format to avoid locale-dependent date formatting
-                const startStr = `${thirtyDaysAgo.getDate()}/${thirtyDaysAgo.getMonth() + 1}/${thirtyDaysAgo.getFullYear()}`;
-                const endStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+                const startDate = new Date(thirtyDaysAgo);
+                const endDate = new Date(now);
+                const startStr = `${startDate.getDate().toString().padStart(2, '0')}/${(startDate.getMonth() + 1).toString().padStart(2, '0')}/${startDate.getFullYear()}`;
+                const endStr = `${endDate.getDate().toString().padStart(2, '0')}/${(endDate.getMonth() + 1).toString().padStart(2, '0')}/${endDate.getFullYear()}`;
+                
                 priceHistory = await fetchStockHistory({
                     symbol,
                     startDate: startStr,
@@ -136,6 +139,8 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                     aiInsight = "Dòng tiền ngoại đang xả ròng do lo ngại AI thay thế nhân sự IT truyền thống, đe dọa biên lợi nhuận mảng Forward. Tuy nhiên, FPT đang nỗ lực chuyển mình sang Chip & Bán dẫn để bù đắp. Cần theo dõi sát ngưỡng hỗ trợ và áp lực bán của 'Whale' trước khi giải ngân.";
                 } else if (symbol === 'FRT' && !hasTrades) {
                     aiInsight = "Chuỗi Long Châu đang bước vào giai đoạn hái quả ngọt với biên lợi nhuận cải thiện mạnh. Dòng tiền thông minh đang gom hàng bền bỉ, kỳ vọng FRT trở thành đế chế Healthcare số 1 Việt Nam.";
+                } else if (symbol === 'VNM' && !hasTrades) {
+                    aiInsight = "Vinamilk đang trong giai đoạn tái định vị thương hiệu mạnh mẽ để trẻ hóa tệp khách hàng. Dòng tiền ngoại dù có rung lắc nhưng vẫn coi đây là 'safe haven' nhờ dòng tiền kinh doanh cực kỳ ổn định. Vùng 62-63 là vùng đệm giá an toàn cho mục tiêu 8x trong năm tới.";
                 } else if (hasTrades) {
                     const recentTrend = recentNetValue > 0 ? 'mua ròng' : 'bán ròng';
                     const totalTrend = netValueTotal > 0 ? 'tích lũy' : 'phân phối';
@@ -197,6 +202,7 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                 action,
                 aiInsight,
                 isLive: hasTrades,
+                latestPrice: priceHistory.length > 0 ? Number(priceHistory[0].close) : 0,
                 history: hasTrades ? trades.slice(0, 10) : []
             };
         }, 15 * 60 * 1000); // 15 minutes cache for AI enhanced results

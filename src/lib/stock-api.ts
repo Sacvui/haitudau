@@ -43,68 +43,88 @@ export async function fetchStockHistory(params: StockHistoryParams): Promise<Sto
 // Fetch foreign trading history
 export async function fetchForeignTrades(symbol: string): Promise<any[]> {
     try {
-        // Try VNDirect as primary source with date range
         const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000); // 45 days back
-        const startDate = formatDateForVND(thirtyDaysAgo.toLocaleDateString('vi-VN'));
+        const thirtyDaysAgo = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
+        
+        const toDate = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+        const fromDate = `${thirtyDaysAgo.getDate().toString().padStart(2, '0')}/${(thirtyDaysAgo.getMonth() + 1).toString().padStart(2, '0')}/${thirtyDaysAgo.getFullYear()}`;
 
-        console.log(`[stock-api] Fetching foreign trades for ${symbol} from VNDirect...`);
-        const response = await axios.get(VNDIRECT_FOREIGN_API, {
-            params: {
-                sort: 'date',
-                q: `code:${symbol}~date:gte:${startDate}`,
-                size: 50,
-                page: 1,
-            },
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://www.vndirect.com.vn/',
-                'Origin': 'https://www.vndirect.com.vn'
-            },
-            timeout: 8000
-        });
-
-        if (response.data && response.data.data && response.data.data.length > 0) {
-            return response.data.data.map((item: any) => ({
-                date: item.date,
-                buyVolume: Number(item.nmBuyVol) || 0,
-                sellVolume: Number(item.nmSellVol) || 0,
-                buyValue: Number(item.nmBuyVal) || 0,
-                sellValue: Number(item.nmSellVal) || 0,
-                netVolume: (Number(item.nmBuyVol) || 0) - (Number(item.nmSellVol) || 0),
-                netValue: (Number(item.nmBuyVal) || 0) - (Number(item.nmSellVal) || 0),
-            }));
-        }
-
-        // Secondary Fallback: SSI iBoard (Alternative endpoint)
-        console.log(`[stock-api] VNDirect empty, falling back to SSI for ${symbol}...`);
+        console.log(`[stock-api] Fetching foreign trades for ${symbol} (${fromDate} to ${toDate}) from SSI Statistics...`);
+        
         try {
-            const ssiRes = await axios.get(`https://iboard.ssi.com.vn/api/scoreboard/stock-foreign-history?stockSymbol=${symbol}`, {
+            // New Robust SSI Endpoint uncovered by exploration
+            const response = await axios.get(`https://iboard-api.ssi.com.vn/statistics/company/ssmi/stock-info`, {
+                params: {
+                    symbol,
+                    fromDate,
+                    toDate,
+                    page: 1,
+                    pageSize: 50
+                },
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Referer': 'https://iboard.ssi.com.vn/',
-                    'Origin': 'https://iboard.ssi.com.vn'
+                    'Origin': 'https://iboard.ssi.com.vn',
+                    'device-id': '530C8E53-D902-46B4-9ACC-406F881AFBDD', // Simulated device ID for session
+                    'Accept': 'application/json, text/plain, */*'
                 },
-                timeout: 5000
+                timeout: 8000
             });
-            if (ssiRes.data && ssiRes.data.data && ssiRes.data.data.length > 0) {
-                return ssiRes.data.data.map((item: any) => ({
-                    date: item.tradingDate, // SSI uses tradingDate
-                    buyVolume: Number(item.totalBuyVol) || 0,
-                    sellVolume: Number(item.totalSellVol) || 0,
-                    buyValue: Number(item.totalBuyVal) || 0,
-                    sellValue: Number(item.totalSellVal) || 0,
-                    netVolume: (Number(item.totalBuyVol) || 0) - (Number(item.totalSellVol) || 0),
-                    netValue: (Number(item.totalBuyVal) || 0) - (Number(item.totalSellVal) || 0),
-                }));
+
+            if (response.data && response.data.data && response.data.data.length > 0) {
+                return response.data.data.map((item: any) => {
+                    const buyVal = Number(item.foreignBuyValTotal) || Number(item.totalBuyVal) || 0;
+                    const sellVal = Number(item.foreignSellValTotal) || Number(item.totalSellVal) || 0;
+                    const buyVol = Number(item.foreignBuyVolTotal) || Number(item.totalBuyVol) || 0;
+                    const sellVol = Number(item.foreignSellVolTotal) || Number(item.totalSellVol) || 0;
+
+                    return {
+                        date: item.tradingDate,
+                        buyVolume: buyVol,
+                        sellVolume: sellVol,
+                        buyValue: buyVal,
+                        sellValue: sellVal,
+                        netVolume: buyVol - sellVol,
+                        netValue: buyVal - sellVal,
+                    };
+                });
             }
         } catch (ssiErr: any) {
-            console.warn(`[stock-api] SSI fallback failed:`, ssiErr.message);
+            console.warn(`[stock-api] SSI Statistics API failed:`, ssiErr.message);
+        }
+
+        // Secondary Fallback: VNDirect (Legacy mapping)
+        console.log(`[stock-api] SSI failing, trying VNDirect fallback for ${symbol}...`);
+        try {
+            const startDateVND = `${thirtyDaysAgo.getFullYear()}-${(thirtyDaysAgo.getMonth() + 1).toString().padStart(2, '0')}-${thirtyDaysAgo.getDate().toString().padStart(2, '0')}`;
+            const vndRes = await axios.get(VNDIRECT_FOREIGN_API, {
+                params: {
+                    sort: 'date',
+                    q: `code:${symbol}~date:gte:${startDateVND}`,
+                    size: 50,
+                    page: 1,
+                },
+                headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.vndirect.com.vn/' },
+                timeout: 5000
+            });
+            if (vndRes.data && vndRes.data.data) {
+                return vndRes.data.data.map((item: any) => ({
+                    date: item.date,
+                    buyVolume: Number(item.nmBuyVol) || 0,
+                    sellVolume: Number(item.nmSellVol) || 0,
+                    buyValue: Number(item.nmBuyVal) || 0,
+                    sellValue: Number(item.nmSellVal) || 0,
+                    netVolume: (Number(item.nmBuyVol) || 0) - (Number(item.nmSellVol) || 0),
+                    netValue: (Number(item.nmBuyVal) || 0) - (Number(item.nmSellVal) || 0),
+                }));
+            }
+        } catch (vndErr: any) {
+            console.warn(`[stock-api] VNDirect fallback failed:`, vndErr.message);
         }
 
         return [];
     } catch (error: any) {
-        console.error('Error fetching foreign trades:', error.message);
+        console.error('Global Error fetching foreign trades:', error.message);
         return [];
     }
 }

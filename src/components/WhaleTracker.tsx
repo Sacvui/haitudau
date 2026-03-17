@@ -20,6 +20,7 @@ interface WhaleData {
     color: string;
     action: string;
     aiInsight?: string;
+    latestPrice?: number;
     history: any[];
 }
 
@@ -148,9 +149,20 @@ export default function WhaleTracker({ initialSymbol = 'VIB', valuationVerdict }
                                 </div>
                                 <p className="text-lg font-black text-white uppercase tracking-tight">
                                     {data.symbol === 'VIB' ? '28.x - 30.x' : 
-                                     data.symbol === 'FPT' ? '125.x - 140.x' : 
+                                     data.symbol === 'FPT' ? '180.x - 200.x' : 
                                      data.symbol === 'FRT' ? '220.x - 240.x' : 
-                                     (valuationVerdict === 'CHEAP' ? 'HỒI PHỤC' : 'TĂNG TRƯỞNG')}
+                                     data.symbol === 'VNM' ? '82.x - 88.x' :
+                                     data.symbol === 'MSN' ? '95.x - 110.x' :
+                                     data.symbol === 'HPG' ? '40.x - 45.x' :
+                                     (() => {
+                                        const currentPrice = data.latestPrice || 0;
+                                        if (currentPrice > 0) {
+                                            const low = Math.round((currentPrice * 1.2) / 100) / 10;
+                                            const high = Math.round((currentPrice * 1.5) / 100) / 10;
+                                            return `${low.toFixed(1)}x - ${high.toFixed(1)}x`;
+                                        }
+                                        return valuationVerdict === 'CHEAP' ? 'HỒI PHỤC' : 'TĂNG TRƯỞNG';
+                                     })()}
                                 </p>
                             </div>
                         </div>
