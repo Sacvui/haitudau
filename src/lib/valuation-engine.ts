@@ -16,6 +16,7 @@ export interface ValuationInput {
     dividendGrowth: number;   // historical dividend growth rate (%)
     industryPE: number;
     dividendYield: number;    // as percentage
+    industry?: string;        // E.g., 'Ngân hàng', 'Công nghệ', 'Bán lẻ'
 }
 
 export interface ValuationResult {
@@ -39,6 +40,7 @@ export interface ValuationSummary {
     marketSentimentScore?: number;
     convictionScore: number;    // 0-100%
     convergenceGrade: string;   // S, A, B, C, D
+    sectorCalibration?: string; // Info about sector-specific adjustments
 }
 
 // ===================== CORE METHODS =====================
@@ -50,8 +52,8 @@ export interface ValuationSummary {
  */
 export function gordonGrowthModel(
     lastDividend: number,
-    growthRate: number,     // decimal (e.g., 0.08 for 8%)
-    requiredReturn: number  // decimal (e.g., 0.12 for 12%)
+    growthRate: number,     // decimal (e.g. 0.08 for 8%)
+    requiredReturn: number  // decimal (e.g. 0.12 for 12%)
 ): number {
     if (lastDividend <= 0 || requiredReturn <= growthRate || requiredReturn <= 0) {
         return 0; // Invalid: can't value non-dividend stocks or when g >= r
@@ -76,16 +78,14 @@ export function peRelativeValuation(
 /**
  * Graham Number (Benjamin Graham)
  * Intrinsic Value = √(Multiplier × EPS × BVPS)
- * The 22.5 comes from Graham's criteria: P/E ≤ 15 and P/B ≤ 1.5 (15 × 1.5 = 22.5)
- * Adjusted for banks (high BVPS): Multiplier lowered to 15
- * Best for: value investing, conservative valuation
  */
-export function grahamNumber(eps: number, bvps: number): number {
+export function grahamNumber(eps: number, bvps: number, isBank: boolean = false): number {
     if (eps <= 0 || bvps <= 0) return 0;
 
-    // Banks/Financials typically have massive Book Value relative to EPS (P/B < 1.5 usually)
-    // The standard 22.5 multiplier over-inflates them.
-    const multiplier = bvps > eps * 4 ? 15.0 : 22.5;
+    // Graham's 22.5 comes from P/E 15 * P/B 1.5. 
+    // For banks, P/E 15 is too high (usually < 10) and P/B 1.5 is standard.
+    // So for banks we use Multiplier = 10 * 1.5 = 15.
+    const multiplier = isBank ? 15.0 : 22.5;
 
     return Math.sqrt(multiplier * eps * bvps);
 }
@@ -93,13 +93,11 @@ export function grahamNumber(eps: number, bvps: number): number {
 /**
  * Simplified DCF (Discounted Cash Flow)
  * Uses EPS as proxy for FCF, projects growth, then discounts back
- * Terminal value via Gordon Growth
- * Best for: growth companies
  */
 export function simplifiedDCF(
     eps: number,
-    initialGrowthRate: number,     // decimal (e.g., 0.15 for 15%)
-    discountRate: number,   // decimal (e.g., 0.12 for 12%)
+    initialGrowthRate: number,     // decimal (e.g. 0.15 for 15%)
+    discountRate: number,   // decimal (e.g. 0.12 for 12%)
     projectionYears: number = 10,
     terminalGrowthRate: number = 0.03 // 3% perpetual growth
 ): number {
@@ -128,7 +126,6 @@ export function simplifiedDCF(
 /**
  * Reverse DCF
  * Numerically solves for the implied growth rate `g` that makes the DCF Intrinsic Value equal to the Current Price.
- * Uses the Bisection Method.
  */
 export function calculateReverseDCF(
     currentPrice: number,
@@ -243,11 +240,28 @@ export function runFullValuation(
     }
 ): ValuationSummary {
     const sentimentScore = customParams?.marketSentimentScore ?? 50;
-    const requiredReturn = (customParams?.requiredReturn || 12) / 100;
+    const isBank = input.industry === 'Ngân hàng' || input.bvps > input.eps * 6;
+    const isGrowth = input.industry === 'Công nghệ' || (input.pe > 15 && input.roe > 15);
+    
+    // Dynamic Calibration Info
+    let sectorCalibration = `Hệ máy tự động hiệu chuẩn cho nhóm ${input.industry || 'Chung'}.`;
+    if (isBank) sectorCalibration = "⚠️ Hiệu chuẩn NH: Chặn trần Graham & DCF bảo thủ, ưu tiên Giá trị Sổ sách và Cổ tức.";
+    if (isGrowth) sectorCalibration = "🚀 Hiệu chuẩn Tech: Ưu tiên Tăng trưởng kép & DCF, hạ trọng số Ben Graham.";
 
-    // FIX: Safely cap EPS growth so DCF doesn't go crazy, but allow real growth to shine
-    // Growth stocks often have high ROE. We take 60% of ROE as sustainable growth (assume 40% payout).
-    const calculatedGrowth = input.roe ? Math.min(input.roe * 0.6, 25) : 10;
+    // Required Return calculation (Risk-adjusted)
+    // Beta is often higher in VN, so 12% is a base. Banks might be 11%, speculative 14%.
+    let baseReturn = (customParams?.requiredReturn || 12) / 100;
+    if (isBank) baseReturn = 0.11; // Slightly lower for systemic assets
+    if (isGrowth) baseReturn = 0.13; // Higher risk premium for tech
+
+    const requiredReturn = baseReturn;
+
+    // Growth calculation
+    // Growth stocks often have high ROE. We take 60% of ROE as sustainable growth.
+    // Banks are more conservative: 40% of ROE.
+    const growthCap = isGrowth ? 25 : 18;
+    const growthRetention = isBank ? 0.4 : 0.6;
+    const calculatedGrowth = input.roe ? Math.min(input.roe * growthRetention, growthCap) : 10;
     const epsGrowth = (customParams?.epsGrowthRate ?? calculatedGrowth) / 100;
 
     const projYears = customParams?.projectionYears || 10;
@@ -255,7 +269,7 @@ export function runFullValuation(
 
     const results: ValuationResult[] = [];
 
-    // 1. DDM - Gordon Growth
+    // 1. DDM - Gordon Growth (Weight elevated for Banks)
     const ddmValue = gordonGrowthModel(input.lastDividend, divGrowth, requiredReturn);
     const ddmMos = calculateMarginOfSafety(ddmValue, input.currentPrice, sentimentScore);
     results.push({
@@ -264,7 +278,7 @@ export function runFullValuation(
         intrinsicValue: ddmValue,
         marginOfSafety: ddmMos.margin,
         verdict: ddmMos.verdict,
-        confidence: input.lastDividend > 0 && input.dividendGrowth > 0 ? 75 : 20,
+        confidence: isBank ? 85 : (input.lastDividend > 0 ? 75 : 15),
         formula: 'P₀ = D₁ / (r - g)',
         inputs: {
             'D₀ (Cổ tức/CP)': `${input.lastDividend.toLocaleString()} đ`,
@@ -274,12 +288,10 @@ export function runFullValuation(
         },
         notes: input.lastDividend <= 0
             ? 'Không áp dụng: Cổ phiếu không trả cổ tức'
-            : ddmValue <= 0
-                ? 'Không áp dụng: Tốc độ tăng trưởng ≥ lãi suất yêu cầu'
-                : 'Phù hợp cho cổ phiếu trả cổ tức ổn định (ngân hàng, tiện ích)',
+            : 'Phù hợp nhất cho nhóm Ngân hàng và các mã Bluechip trả tiền mặt ổn định.',
     });
 
-    // 2. P/E Relative Valuation
+    // 2. P/E Relative Valuation (Always relevant as a baseline)
     const peValue = peRelativeValuation(input.eps, input.industryPE);
     const peMos = calculateMarginOfSafety(peValue, input.currentPrice, sentimentScore);
     results.push({
@@ -288,20 +300,18 @@ export function runFullValuation(
         intrinsicValue: peValue,
         marginOfSafety: peMos.margin,
         verdict: peMos.verdict,
-        confidence: input.eps > 0 && input.industryPE > 0 ? 70 : 15,
+        confidence: input.eps > 0 && input.industryPE > 0 ? 65 : 15,
         formula: 'Fair Value = EPS × P/E ngành',
         inputs: {
             'EPS': `${input.eps.toLocaleString()} đ`,
             'P/E ngành': `${input.industryPE.toFixed(1)}x`,
             'P/E hiện tại': `${input.pe.toFixed(1)}x`,
         },
-        notes: input.eps <= 0
-            ? 'Không áp dụng: EPS âm (công ty thua lỗ)'
-            : 'So sánh định giá với trung bình ngành',
+        notes: 'Chỉ số tham chiếu nhanh từ thị trường.',
     });
 
-    // 3. Graham Number
-    const grahamValue = grahamNumber(input.eps, input.bvps);
+    // 3. Graham Number (Significant for Banks, discounted for Growth)
+    const grahamValue = grahamNumber(input.eps, input.bvps, isBank);
     const grahamMos = calculateMarginOfSafety(grahamValue, input.currentPrice, sentimentScore);
     results.push({
         method: 'Số Graham',
@@ -309,19 +319,17 @@ export function runFullValuation(
         intrinsicValue: grahamValue,
         marginOfSafety: grahamMos.margin,
         verdict: grahamMos.verdict,
-        confidence: input.eps > 0 && input.bvps > 0 ? 65 : 10,
-        formula: '√(22.5 × EPS × BVPS)',
+        confidence: isBank ? 80 : (isGrowth ? 20 : 65),
+        formula: isBank ? '√(15.0 × EPS × BVPS)' : '√(22.5 × EPS × BVPS)',
         inputs: {
             'EPS': `${input.eps.toLocaleString()} đ`,
             'BVPS': `${input.bvps.toLocaleString()} đ`,
-            'Hệ số Graham': '22.5 (P/E≤15 × P/B≤1.5)',
+            'Hệ số Graham': isBank ? '15.0 (Bảo thủ NH)' : '22.5 (P/E 15 × P/B 1.5)',
         },
-        notes: input.eps <= 0 || input.bvps <= 0
-            ? 'Không áp dụng: EPS hoặc BVPS âm'
-            : 'Phương pháp bảo thủ của Benjamin Graham — phù hợp Value Investing',
+        notes: isGrowth ? 'Ít tin cậy với hàng tăng trưởng.' : 'Mô hình kinh điển, bảo vệ vốn tuyệt vời.',
     });
 
-    // 4. Simplified DCF
+    // 4. Simplified DCF (King of Tech/Growth, cautious for Banks)
     const dcfValue = simplifiedDCF(input.eps, epsGrowth, requiredReturn, projYears);
     const dcfMos = calculateMarginOfSafety(dcfValue, input.currentPrice, sentimentScore);
     results.push({
@@ -330,47 +338,24 @@ export function runFullValuation(
         intrinsicValue: dcfValue,
         marginOfSafety: dcfMos.margin,
         verdict: dcfMos.verdict,
-        confidence: input.eps > 0 ? 60 : 10,
-        formula: 'PV(EPS tương lai) + Terminal Value',
+        confidence: isGrowth ? 90 : (isBank ? 50 : 60),
+        formula: 'PV(Tương lai) + Terminal Value',
         inputs: {
             'EPS hiện tại': `${input.eps.toLocaleString()} đ`,
-            'Tăng trưởng EPS': `${(epsGrowth * 100).toFixed(1)}%`,
-            'Chiết khấu (WACC)': `${(requiredReturn * 100).toFixed(1)}%`,
-            'Số năm dự phóng': `${projYears} năm`,
-            'Tăng trưởng vĩnh viễn': '3%',
+            'Tăng trưởng dự phóng': `${(epsGrowth * 100).toFixed(1)}%`,
+            'Chiết khấu (r)': `${(requiredReturn * 100).toFixed(1)}%`,
+            'Số năm': `${projYears} năm`,
         },
-        notes: input.eps <= 0
-            ? 'Không áp dụng: EPS âm'
-            : 'Dùng EPS làm proxy cho Free Cash Flow — phù hợp công ty tăng trưởng',
+        notes: 'Phương pháp định giá dòng tiền kỳ vọng.',
     });
 
-    // Calculate weighted average intrinsic value (only from valid results)
-    const validResults = results.filter(r => r.intrinsicValue > 0 && r.confidence > 20);
-
-    // Apply penalty to extreme outliers (e.g., Graham Number for banks with huge BVPS)
-    // FIX: Apply Growth/Tech company adjustments (High P/E, High ROE, High P/B)
-    const isGrowthStock = input.pe > 15 && input.pb >= 3 && input.roe >= 15;
+    // Weighting & Final Grade
+    const validResults = results.filter(r => r.intrinsicValue > 0 && r.confidence >= 20);
 
     const adjustedResults = validResults.map(r => {
         let adjConfidence = r.confidence;
-
-        // Growth stocks get heavily penalized in Graham (which expects P/E < 15 and P/B < 1.5)
-        if (isGrowthStock && r.methodKey === 'graham') {
-            adjConfidence = r.confidence * 0.1; // Virtually ignore Ben Graham for FPT/MWG
-        }
-
-        // Growth stocks get a slight boost in DCF confidence
-        if (isGrowthStock && r.methodKey === 'dcf') {
-            adjConfidence = Math.min(100, r.confidence * 1.5);
-        }
-
-        if (r.intrinsicValue > input.currentPrice * 2) {
-            // If valuation is >200% of current price, slash its confidence weight heavily
-            adjConfidence = adjConfidence * 0.2;
-        } else if (r.intrinsicValue > input.currentPrice * 1.5) {
-            // If valuation is >150% of current price, reduce confidence moderately
-            adjConfidence = adjConfidence * 0.5;
-        }
+        // Penality for extreme flyers (> 80% upside needs higher conviction)
+        if (r.intrinsicValue > input.currentPrice * 1.8) adjConfidence *= 0.4;
         return { ...r, adjConfidence };
     });
 
@@ -381,35 +366,22 @@ export function runFullValuation(
 
     const overallMos = calculateMarginOfSafety(weightedAvg, input.currentPrice, sentimentScore);
 
-    // ===================== CONVICTION CALCULATION =====================
-    // 1. Convergence: How much do the models agree?
-    let convergenceScore = 0;
+    // Convergence logic
     let grade = 'C';
     if (adjustedResults.length >= 2) {
         const values = adjustedResults.map(r => r.intrinsicValue);
         const avg = values.reduce((a, b) => a + b, 0) / values.length;
         const squareDiffs = values.map(v => Math.pow(v - avg, 2));
         const stdDev = Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / values.length);
-        const cv = stdDev / avg; // Coefficient of Variation
+        const cv = stdDev / avg;
 
-        // CV < 10% = S, < 20% = A, < 35% = B, < 50% = C, > 50% = D
-        if (cv < 0.1) { convergenceScore = 100; grade = 'S'; }
-        else if (cv < 0.2) { convergenceScore = 85; grade = 'A'; }
-        else if (cv < 0.35) { convergenceScore = 70; grade = 'B'; }
-        else if (cv < 0.5) { convergenceScore = 50; grade = 'C'; }
-        else { convergenceScore = 30; grade = 'D'; }
+        if (cv < 0.15) grade = 'S';
+        else if (cv < 0.25) grade = 'A';
+        else if (cv < 0.4) grade = 'B';
+        else grade = 'C';
     }
 
-    // 2. Data Quality: ROE + Consistency
-    const qualityScore = Math.min(100, (input.roe || 0) * 3 + (input.dividendYield || 0) * 5);
-
-    // 3. Model Strength: How many reliable models did we use?
-    const modelStrength = Math.min(100, adjustedResults.length * 25);
-
-    // Final Conviction Score: 40% Convergence + 30% Quality + 30% Model Strength
-    const convictionScore = Math.round(
-        (convergenceScore * 0.4) + (qualityScore * 0.3) + (modelStrength * 0.3)
-    );
+    const convictionRaw = Math.min(100, (grade === 'S' ? 95 : grade === 'A' ? 85 : 70) + (isBank || isGrowth ? 10 : 0));
 
     return {
         averageIntrinsic: weightedAvg,
@@ -418,7 +390,8 @@ export function runFullValuation(
         overallVerdict: overallMos.verdict === 'N/A' ? 'FAIR' : overallMos.verdict,
         results,
         marketSentimentScore: sentimentScore,
-        convictionScore: Math.min(100, Math.max(0, convictionScore)),
-        convergenceGrade: grade
+        convictionScore: Math.min(100, convictionRaw),
+        convergenceGrade: grade,
+        sectorCalibration
     };
 }

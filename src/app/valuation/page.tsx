@@ -124,21 +124,20 @@ export default function ValuationPage() {
                 lastDividend: data.lastDividend,
                 dividendGrowth: data.dividendGrowth5Y,
                 industryPE: data.industryPE || 15,
-                dividendYield: data.dividendYield
+                dividendYield: data.dividendYield,
+                industry: data.industry
             };
 
-            // Assuming projectionYears and sentimentScore are defined elsewhere or default values are used
-            // For this change, we'll use placeholder values if not defined in the original context
-            const projectionYears = 10; // Placeholder, adjust as needed
-            const sentimentScore = sentiment?.score || 50; // Use existing sentiment state
+            const sentimentScore = sentiment?.score || 50;
 
             const result = runFullValuation(input, {
                 requiredReturn: requiredReturn,
-                projectionYears: projectionYears,
+                projectionYears: 10,
                 marketSentimentScore: sentimentScore
             });
             setValuation(result);
 
+            const projectionYears = 10;
             const sensitivity = generateSensitivityTable(
                 data.eps,
                 Math.min(data.roe * 0.6, 25) / 100, // Matching default logic
@@ -845,7 +844,7 @@ function SummaryCard({ valuation, fundamentals }: { valuation: ValuationSummary;
                             </p>
                         </div>
                         <div className="text-center pl-6 border-l border-white/10">
-                            <p className="text-[10px] text-slate-500 uppercase font-bold">Độ tin cậy</p>
+                            <p className="text-[10px] text-slate-500 uppercase font-bold text-left mb-1">Độ tin cậy & Hiệu chuẩn</p>
                             <div className="flex items-center gap-2">
                                 <span className={`text-xl font-black ${
                                     valuation.convictionScore >= 80 ? 'text-emerald-400' :
@@ -855,7 +854,7 @@ function SummaryCard({ valuation, fundamentals }: { valuation: ValuationSummary;
                                 }`}>
                                     {valuation.convictionScore}%
                                 </span>
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shadow-inner shadow-black/40 ${
                                     valuation.convergenceGrade === 'S' ? 'bg-amber-400 text-black' :
                                     valuation.convergenceGrade === 'A' ? 'bg-emerald-500 text-white' :
                                     valuation.convergenceGrade === 'B' ? 'bg-sky-500 text-white' :
@@ -867,6 +866,14 @@ function SummaryCard({ valuation, fundamentals }: { valuation: ValuationSummary;
                         </div>
                     </div>
                 </div>
+
+                {/* Sector Calibration Banner */}
+                {valuation.sectorCalibration && (
+                    <div className="mt-4 px-4 py-2 bg-black/40 border border-white/5 rounded-2xl flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                        <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">{valuation.sectorCalibration}</span>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
@@ -903,7 +910,7 @@ function MethodCard({ result, currentPrice }: { result: ValuationResult; current
     const isValid = result.intrinsicValue > 0 && result.confidence > 20;
 
     return (
-        <Card className={`bg-[#111827] border-slate-800 shadow-lg overflow-hidden ${!isValid ? 'opacity-60' : ''}`}>
+        <Card className={`bg-[#111827] border-slate-800 shadow-lg overflow-hidden transition-all duration-300 hover:border-slate-700 ${!isValid ? 'opacity-60' : ''}`}>
             <CardHeader className="pb-3 border-b border-slate-800 bg-slate-900/50">
                 <div className="flex items-center justify-between">
                     <div>
@@ -913,7 +920,7 @@ function MethodCard({ result, currentPrice }: { result: ValuationResult; current
                         </CardTitle>
                         <CardDescription className="text-xs text-slate-500 mt-1 font-mono">{result.formula}</CardDescription>
                     </div>
-                    <Badge className={`${config.bg} ${config.color} text-xs font-bold`}>
+                    <Badge className={`${config.bg} ${config.color} text-xs font-bold px-2 py-0.5`}>
                         <VerdictIcon className="w-3 h-3 mr-1" />
                         {config.label}
                     </Badge>
