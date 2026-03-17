@@ -7,6 +7,7 @@
       "role": "admin",
       "permissions": {
         "vn100": true,
+        "quality100": true,
         "top20": true
       },
       "displayName": "Hải LP",
@@ -19,6 +20,7 @@
       "role": "user",
       "permissions": {
         "vn100": true,
+        "quality100": true,
         "top20": true
       },
       "displayName": "Phát HT",

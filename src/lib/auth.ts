@@ -5,6 +5,7 @@ import path from 'path';
 // ───── Types ─────
 export interface UserPermissions {
     vn100: boolean;
+    quality100: boolean;
     top20: boolean;
 }
 
@@ -89,7 +90,7 @@ export function ensureDefaultAdmin(): void {
             username: 'HaiLP',
             passwordHash: defaultHash,
             role: 'admin',
-            permissions: { vn100: true, top20: true },
+            permissions: { vn100: true, quality100: true, top20: true },
             displayName: 'Hải LP',
             createdAt: new Date().toISOString(),
         });

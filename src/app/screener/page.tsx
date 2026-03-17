@@ -134,15 +134,15 @@ export default function DividendScreenerPage() {
     const [activeTab, setActiveTab] = useState<'screener' | 'calendar'>('screener');
 
     // === SCREENER STATE === //
-    const [selectedGroup, setSelectedGroup] = useState<'vn30' | 'vn100' | 'top20'>('vn30');
+    const [selectedGroup, setSelectedGroup] = useState<'vn30' | 'vn100' | 'quality100' | 'top20'>('vn30');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [authUsername, setAuthUsername] = useState('');
     const [authPassword, setAuthPassword] = useState('');
     const [authError, setAuthError] = useState('');
-    const [pendingGroup, setPendingGroup] = useState<'vn100' | 'top20' | null>(null);
+    const [pendingGroup, setPendingGroup] = useState<'vn100' | 'quality100' | 'top20' | null>(null);
     const [loginLoading, setLoginLoading] = useState(false);
-    const [userPermissions, setUserPermissions] = useState<{ vn100: boolean; top20: boolean }>({ vn100: false, top20: false });
+    const [userPermissions, setUserPermissions] = useState<{ vn100: boolean; quality100?: boolean; top20: boolean }>({ vn100: false, quality100: false, top20: false });
     const [userName, setUserName] = useState('');
 
     const [stocks, setStocks] = useState<StockDividendData[]>([]);
@@ -203,7 +203,7 @@ export default function DividendScreenerPage() {
         }).catch(() => { });
     }, []);
 
-    const handleGroupChange = (group: 'vn30' | 'vn100' | 'top20') => {
+    const handleGroupChange = (group: 'vn30' | 'vn100' | 'quality100' | 'top20') => {
         if (group !== 'vn30') {
             if (!isAuthenticated) {
                 setPendingGroup(group);
@@ -213,6 +213,11 @@ export default function DividendScreenerPage() {
             // Check specific permission
             if (group === 'vn100' && !userPermissions.vn100) {
                 setAuthError('Bạn không có quyền truy cập VN100. Liên hệ Admin.');
+                setShowAuthModal(true);
+                return;
+            }
+            if (group === 'quality100' && !userPermissions.quality100) {
+                setAuthError('Bạn không có quyền truy cập 100 CP Tốt. Liên hệ Admin.');
                 setShowAuthModal(true);
                 return;
             }
@@ -244,7 +249,7 @@ export default function DividendScreenerPage() {
                 setShowAuthModal(false);
                 setAuthError('');
                 if (pendingGroup) {
-                    const perm = pendingGroup === 'vn100' ? data.user.permissions?.vn100 : data.user.permissions?.top20;
+                    const perm = pendingGroup === 'vn100' ? data.user.permissions?.vn100 : (pendingGroup === 'quality100' ? data.user.permissions?.quality100 : data.user.permissions?.top20);
                     if (perm) {
                         setSelectedGroup(pendingGroup);
                         setStocks([]);
@@ -473,10 +478,16 @@ export default function DividendScreenerPage() {
                                 <Button
                                     variant={selectedGroup === 'vn100' ? 'default' : 'ghost'}
                                     onClick={() => handleGroupChange('vn100')}
-                                    className={selectedGroup === 'vn100' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}
+                                    className={selectedGroup === 'vn100' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}
                                 >
-                                    {isAuthenticated ? <Unlock className="w-4 h-4 mr-2" /> : <Lock className="w-4 h-4 mr-2" />}
-                                    Nâng Cao (VN100)
+                                    Tiêu Chuẩn (VN100)
+                                </Button>
+                                <Button
+                                    variant={selectedGroup === 'quality100' ? 'default' : 'ghost'}
+                                    onClick={() => handleGroupChange('quality100')}
+                                    className={selectedGroup === 'quality100' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}
+                                >
+                                    ⭐ 100 CP Tốt
                                 </Button>
                                 <Button
                                     variant={selectedGroup === 'top20' ? 'default' : 'ghost'}

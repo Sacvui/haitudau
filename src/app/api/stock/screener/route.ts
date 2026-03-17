@@ -21,6 +21,18 @@ const VN100_SYMBOLS = [
     'VCG', 'VCI', 'VGC', 'VHC', 'VIX', 'VND', 'VPI', 'VSH'
 ];
 
+// 100 High-Quality Stocks (Curated for Fundamentals & Liquidity)
+const QUALITY_100_SYMBOLS = [
+    ...VN30_SYMBOLS,
+    'ANV', 'BSI', 'BSR', 'CMG', 'CTD', 'CTR', 'DBC', 'DCM', 'DGC', 'DGW',
+    'DHC', 'DIG', 'DPM', 'DPR', 'DXG', 'EIB', 'FTS', 'GEG', 'GEX', 'GMD',
+    'HAH', 'HCM', 'HDC', 'HDG', 'HHV', 'HSG', 'HT1', 'IDC', 'IDI', 'IJC',
+    'KBC', 'KDC', 'KDH', 'KOS', 'LPB', 'MSB', 'NKG', 'NLG', 'NT2', 'OCB',
+    'PAN', 'PC1', 'PDR', 'PET', 'PHR', 'PNJ', 'PTB', 'PVD', 'PVS', 'PVT',
+    'REE', 'SCS', 'SGP', 'SHS', 'SJS', 'SZC', 'TCH', 'TCM', 'TDC', 'TLG',
+    'TMS', 'TV2', 'VCG', 'VCI', 'VGC', 'VHC', 'VIX', 'VND', 'VPI', 'VSC'
+];
+
 // Helper: Calculate consistency score (1-5) based on dividend history quality
 function calculateConsistency(history: any[]): number {
     if (!history || history.length === 0) return 0;
@@ -97,6 +109,7 @@ export async function GET(request: NextRequest) {
 
         let targetSymbols = VN30_SYMBOLS;
         if (group === 'vn100') targetSymbols = VN100_SYMBOLS;
+        if (group === 'quality100') targetSymbols = QUALITY_100_SYMBOLS;
         if (group === 'top20') targetSymbols = VN100_SYMBOLS; // Score all VN100, then pick top 20
 
         // 1. Fetch Realtime Prices from SSI in chunks to avoid URL length limits
