@@ -148,8 +148,8 @@ export default function WhaleTracker({ initialSymbol = 'VIB', valuationVerdict }
                                 </div>
                                 <p className="text-lg font-black text-white uppercase tracking-tight">
                                     {data.symbol === 'VIB' ? '28.x - 30.x' : 
-                                     data.symbol === 'FPT' ? '180.x - 200.x' : 
-                                     data.symbol === 'FRT' ? '220.x - 250.x' : 
+                                     data.symbol === 'FPT' ? '125.x - 140.x' : 
+                                     data.symbol === 'FRT' ? '220.x - 240.x' : 
                                      (valuationVerdict === 'CHEAP' ? 'HỒI PHỤC' : 'TĂNG TRƯỞNG')}
                                 </p>
                             </div>
