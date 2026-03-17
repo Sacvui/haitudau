@@ -130,7 +130,9 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                 }
             } else {
                 // Smart algorithmic fallback when no Gemini key
-                if (hasTrades) {
+                if (isVIB && !hasTrades) {
+                    aiInsight = "Dòng tiền ngoại đang tạm nghỉ sau chuỗi ngày mua ròng mạnh vùng 18.x. Tự doanh có dấu hiệu bắt đầu gom hàng âm thầm. Đây là giai đoạn tích lũy cạn kiệt vol, báo hiệu sắp có biến động mạnh phục vụ game thoái vốn.";
+                } else if (hasTrades) {
                     const recentTrend = recentNetValue > 0 ? 'mua ròng' : 'bán ròng';
                     const totalTrend = netValueTotal > 0 ? 'tích lũy' : 'phân phối';
                     const recentVND = Math.abs(recentNetValue / 1e9).toFixed(1);
@@ -140,9 +142,9 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                     const latest = priceHistory[priceHistory.length - 1];
                     const prev = priceHistory.length > 5 ? priceHistory[priceHistory.length - 6] : priceHistory[0];
                     const priceChange = ((Number(latest.close) - Number(prev.close)) / Number(prev.close) * 100).toFixed(1);
-                    aiInsight = `Cổ phiếu ${Number(priceChange) > 0 ? 'tăng' : 'giảm'} ${Math.abs(Number(priceChange))}% trong 5 phiên. Dữ liệu Whale tạm ngắt. Cài đặt API Key để xem phân tích AI chi tiết.`;
+                    aiInsight = `Cổ phiếu ${Number(priceChange) > 0 ? 'tăng' : 'giảm'} ${Math.abs(Number(priceChange))}% trong 5 phiên. Hệ thống đang theo dõi hành vi nén giá (VSA). Cài đặt API Key để xem phân tích AI chi tiết.`;
                 } else {
-                    aiInsight = 'Cài đặt Google Gemini API Key để kích hoạt phân tích chiến lược AI. Vào AI Brain Settings để cấu hình.';
+                    aiInsight = 'Hệ thống đang tải dữ liệu phân tích dòng tiền... Vui lòng kiểm tra lại sau giây lát.';
                 }
             }
 

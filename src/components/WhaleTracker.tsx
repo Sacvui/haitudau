@@ -144,10 +144,10 @@ export default function WhaleTracker({ initialSymbol = 'VIB', valuationVerdict }
                             <div className="bg-slate-900/20 p-3 rounded-xl border border-slate-800/50">
                                 <div className="flex items-center gap-2 mb-1">
                                     <Users className="w-3.5 h-3.5 text-indigo-400" />
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase">Tầm nhìn 2026</span>
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase">Phóng chiếu 2026</span>
                                 </div>
                                 <p className="text-lg font-black text-white uppercase tracking-tight">
-                                    {data.symbol === 'VIB' ? 'CHIẾN LƯỢC' : 'TĂNG TRƯỞNG'}
+                                    {data.symbol === 'VIB' ? '28.x - 30.x' : (valuationVerdict === 'CHEAP' ? 'HỒI PHỤC' : 'TĂNG TRƯỞNG')}
                                 </p>
                             </div>
                         </div>

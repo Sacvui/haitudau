@@ -660,22 +660,31 @@ export default function ValuationPage() {
                                         const growth = fundamentals.profitGrowth; // already percentage (e.g. 20)
 
                                         // Method 1: P/B × BVPS — target P/B = max(1.5, ROE/10)
-                                        const fairPB = Math.max(1.5, roe / 10);
+                                        const isBank = fundamentals.industry === 'Ngân hàng';
+                                        let fairPB = Math.max(1.5, roe / 10);
+                                        if (isBank) fairPB = Math.min(1.6, fairPB); // Bank PB rarely exceeds 1.6x in VN
                                         const targetPB = bvps * fairPB;
 
                                         // Method 2: P/E × EPS — Blend industry average and projected growth
                                         const basePE = fundamentals.industryPE || 15;
-                                        const targetPE_ratio = growth > 0 ? Math.max(10, Math.min(basePE * 1.5, (basePE + growth) / 2)) : basePE;
+                                        let targetPE_ratio = growth > 0 ? Math.max(10, Math.min(basePE * 1.5, (basePE + growth) / 2)) : basePE;
+                                        if (isBank) targetPE_ratio = Math.min(10, targetPE_ratio); // Bank PE typically caps at 10x
                                         const targetPE = eps * targetPE_ratio;
 
                                         // Method 3: PEG-adjusted — Premium expansion for tech/growth sectors
                                         const peg = growth > 0 ? pe / growth : 2;
-                                        const fairPEG = basePE >= 20 ? 1.2 : 1.0; // Premium sectors command > 1.0 PEG
-                                        const targetPEG = growth > 0 ? eps * growth * fairPEG : targetPE;
+                                        const fairPEG = (basePE >= 20 || isBank) ? 1.0 : 1.0;
+                                        let targetPEG = growth > 0 ? eps * growth * fairPEG : targetPE;
+                                        if (isBank) targetPEG = Math.min(targetPEG, eps * 11); // Cap Bank PEG price at P/E 11x
 
                                         // Smart Sector Weighting for final target
                                         let weightPB = 1 / 3, weightPE = 1 / 3, weightPEG = 1 / 3;
-                                        if (basePE >= 20 || roe >= 20 || pb >= 4) {
+                                        if (isBank) {
+                                            // Banking/Financials: P/B is paramount
+                                            weightPB = 0.60;
+                                            weightPE = 0.30;
+                                            weightPEG = 0.10;
+                                        } else if (basePE >= 20 || roe >= 20 || pb >= 4) {
                                             // Asset-light / Tech / High Growth: Downweight P/B heavily
                                             weightPB = 0.10;
                                             weightPE = 0.45;
