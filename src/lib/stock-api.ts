@@ -73,19 +73,22 @@ export async function fetchForeignTrades(symbol: string): Promise<any[]> {
 
             if (response.data && response.data.data && response.data.data.length > 0) {
                 return response.data.data.map((item: any) => {
-                    const buyVal = Number(item.foreignBuyValTotal) || Number(item.totalBuyVal) || 0;
-                    const sellVal = Number(item.foreignSellValTotal) || Number(item.totalSellVal) || 0;
-                    const buyVol = Number(item.foreignBuyVolTotal) || Number(item.totalBuyVol) || 0;
-                    const sellVol = Number(item.foreignSellVolTotal) || Number(item.totalSellVol) || 0;
-
+                    // Use netBuySellVal/Vol directly if available (most reliable for SSI)
+                    const netVal = Number(item.netBuySellVal);
+                    const netVol = Number(item.netBuySellVol);
+                    
+                    const buyVol = Number(item.foreignBuyVolTotal) || 0;
+                    const sellVol = Number(item.foreignSellVolTotal) || 0;
+                    
+                    // Fallback to volumes if values are missing
                     return {
                         date: item.tradingDate,
                         buyVolume: buyVol,
                         sellVolume: sellVol,
-                        buyValue: buyVal,
-                        sellValue: sellVal,
-                        netVolume: buyVol - sellVol,
-                        netValue: buyVal - sellVal,
+                        buyValue: 0, // We usually only care about net for the UI
+                        sellValue: 0,
+                        netVolume: !isNaN(netVol) ? netVol : (buyVol - sellVol),
+                        netValue: !isNaN(netVal) ? netVal : 0,
                     };
                 });
             }

@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
     try {
         const hasUserKey = !!userGeminiKey;
-        const cacheKey = `whale_tracker_v3_debug_${symbol}_${verdict || 'NONE'}${hasUserKey ? '_user' : ''}`;
+        const cacheKey = `whale_tracker_v4_debug_${symbol}_${verdict || 'NONE'}${hasUserKey ? '_user' : ''}`;
         const trackerData = await getWithCache(cacheKey, async () => {
             let trades: any[] = [];
             try {
