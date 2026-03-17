@@ -62,6 +62,7 @@ const STOCK_METADATA: Record<string, { name: string, industry: string }> = {
     'DGC': { name: 'Hóa chất Đức Giang', industry: 'Hóa chất' },
     'VCI': { name: 'Chứng khoán Vietcap', industry: 'Chứng khoán' },
     'VND': { name: 'Chứng khoán VNDIRECT', industry: 'Chứng khoán' },
+    'FRT': { name: 'Bán lẻ FPT (Long Châu)', industry: 'Bán lẻ' },
 };
 
 export async function GET(request: NextRequest) {

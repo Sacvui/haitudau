@@ -147,7 +147,10 @@ export default function WhaleTracker({ initialSymbol = 'VIB', valuationVerdict }
                                     <span className="text-[10px] font-bold text-slate-500 uppercase">Phóng chiếu 2026</span>
                                 </div>
                                 <p className="text-lg font-black text-white uppercase tracking-tight">
-                                    {data.symbol === 'VIB' ? '28.x - 30.x' : (valuationVerdict === 'CHEAP' ? 'HỒI PHỤC' : 'TĂNG TRƯỞNG')}
+                                    {data.symbol === 'VIB' ? '28.x - 30.x' : 
+                                     data.symbol === 'FPT' ? '180.x - 200.x' : 
+                                     data.symbol === 'FRT' ? '220.x - 250.x' : 
+                                     (valuationVerdict === 'CHEAP' ? 'HỒI PHỤC' : 'TĂNG TRƯỞNG')}
                                 </p>
                             </div>
                         </div>

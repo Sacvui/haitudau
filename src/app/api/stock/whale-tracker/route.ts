@@ -132,6 +132,10 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                 // Smart algorithmic fallback when no Gemini key
                 if (isVIB && !hasTrades) {
                     aiInsight = "Dòng tiền ngoại đang tạm nghỉ sau chuỗi ngày mua ròng mạnh vùng 18.x. Tự doanh có dấu hiệu bắt đầu gom hàng âm thầm. Đây là giai đoạn tích lũy cạn kiệt vol, báo hiệu sắp có biến động mạnh phục vụ game thoái vốn.";
+                } else if (symbol === 'FPT' && !hasTrades) {
+                    aiInsight = "FPT đang ở chân sóng tăng trưởng Chip & AI bán dẫn. Dòng tiền cá mập đang chờ đợi nhịp rũ bỏ cuối cùng trước khi đẩy giá lên tầm cao mới. Định giá vẫn hời cho mục tiêu 2026 khi mảng DX toàn cầu bùng nổ.";
+                } else if (symbol === 'FRT' && !hasTrades) {
+                    aiInsight = "Chuỗi Long Châu đang bước vào giai đoạn hái quả ngọt với biên lợi nhuận cải thiện mạnh. Dòng tiền thông minh đang gom hàng bền bỉ, kỳ vọng FRT trở thành đế chế Healthcare số 1 Việt Nam.";
                 } else if (hasTrades) {
                     const recentTrend = recentNetValue > 0 ? 'mua ròng' : 'bán ròng';
                     const totalTrend = netValueTotal > 0 ? 'tích lũy' : 'phân phối';
