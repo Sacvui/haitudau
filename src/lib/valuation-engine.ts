@@ -30,7 +30,6 @@ export interface ValuationResult {
     inputs: Record<string, string>;
     notes: string;
 }
-
 export interface ValuationSummary {
     averageIntrinsic: number;
     currentPrice: number;
@@ -38,9 +37,10 @@ export interface ValuationSummary {
     overallVerdict: 'CHEAP' | 'FAIR' | 'EXPENSIVE';
     results: ValuationResult[];
     marketSentimentScore?: number;
-    convictionScore: number;    // 0-100%
-    convergenceGrade: string;   // S, A, B, C, D
-    sectorCalibration?: string; // Info about sector-specific adjustments
+    convictionScore: number;    // 0-100
+    convergenceGrade: 'S' | 'A' | 'B' | 'C';
+    sectorCalibration?: string;
+    relativeTarget: number;    // Short/Mid-term target price blend (P/B, P/E, PEG)
 }
 
 export const SECTOR_MAP: Record<string, string> = {
@@ -54,43 +54,58 @@ export const SECTOR_MAP: Record<string, string> = {
     'MSN': 'Tiêu dùng', 'SAB': 'Tiêu dùng', 'VNM': 'Tiêu dùng', 'KDC': 'Tiêu dùng',
     'BCM': 'Bất động sản', 'GVR': 'Cao su', 'VHM': 'Bất động sản', 'DXG': 'Bất động sản', 'PDR': 'Bất động sản', 'NLG': 'Bất động sản',
     'VIC': 'Bất động sản', 'VRE': 'Bất động sản', 'VJC': 'Hàng không', 'HVN': 'Hàng không', 'DGC': 'Hóa chất',
-    'CTR': 'Viễn thông', 'VGI': 'Công nghệ'
+    'CTR': 'Viễn thông', 'VGI': 'Công nghệ', 'DBC': 'Nông nghiệp', 'MSB': 'Ngân hàng', 'LPB': 'Ngân hàng', 'EIB': 'Ngân hàng',
+    'OCB': 'Ngân hàng', 'TCH': 'Bất động sản'
 };
 
-export const VN30_BASE_RATIOS: Record<string, { pe: number, pb: number, roe: number, name?: string }> = {
-    'VIB': { pe: 6, pb: 1.2, roe: 18, name: 'VIBBank' },
-    'TCB': { pe: 6.5, pb: 1.1, roe: 16, name: 'Techcombank' },
-    'MBB': { pe: 5.5, pb: 1.1, roe: 20, name: 'MBBank' },
-    'ACB': { pe: 6.5, pb: 1.4, roe: 22, name: 'Ngân hàng Á Châu' },
-    'CTG': { pe: 7.5, pb: 1.2, roe: 15, name: 'VietinBank' },
-    'BID': { pe: 10, pb: 1.8, roe: 16, name: 'BIDV' },
-    'VCB': { pe: 14, pb: 2.8, roe: 20, name: 'Vietcombank' },
-    'STB': { pe: 8.0, pb: 1.1, roe: 18, name: 'Sacombank' },
-    'TPB': { pe: 7.0, pb: 1.0, roe: 15, name: 'TPBank' },
-    'VPB': { pe: 8.5, pb: 1.0, roe: 13, name: 'VPBank' },
-    'HDB': { pe: 6.5, pb: 1.3, roe: 23, name: 'HDBank' },
-    'SHB': { pe: 5.0, pb: 0.7, roe: 14, name: 'SHB' },
-    'FPT': { pe: 24, pb: 6.0, roe: 28, name: 'FPT Corp' },
-    'HPG': { pe: 14, pb: 1.6, roe: 12, name: 'Hòa Phát' },
-    'MWG': { pe: 25, pb: 2.5, roe: 10, name: 'Thế giới Di động' },
-    'VNM': { pe: 16, pb: 4.5, roe: 28, name: 'Vinamilk' },
-    'SSI': { pe: 18, pb: 1.8, roe: 10, name: 'Chứng khoán SSI' },
-    'VND': { pe: 15, pb: 1.4, roe: 9, name: 'Chứng khoán VNDIRECT' },
-    'VHM': { pe: 5.5, pb: 0.8, roe: 15, name: 'Vinhomes' },
-    'VIC': { pe: 30, pb: 1.5, roe: 5, name: 'Vingroup' },
-    'VRE': { pe: 12, pb: 1.2, roe: 10, name: 'Vincom Retail' },
-    'GAS': { pe: 16, pb: 2.5, roe: 16, name: 'PV GAS' },
-    'MSN': { pe: 20, pb: 3.5, roe: 18, name: 'Masan Group' },
-    'DGC': { pe: 12, pb: 3.0, roe: 35, name: 'Hóa chất Đức Giang' },
-    'VCI': { pe: 18, pb: 1.9, roe: 12, name: 'Chứng khoán Vietcap' },
-    'FRT': { pe: 45, pb: 5.0, roe: 8, name: 'Bán lẻ FPT (Long Châu)' },
-    'BVH': { pe: 12, pb: 1.1, roe: 10, name: 'Bảo Việt' },
-    'PLX': { pe: 14, pb: 1.5, roe: 12, name: 'Petrolimex' },
-    'POW': { pe: 15, pb: 0.8, roe: 5, name: 'PV Power' },
-    'SAB': { pe: 18, pb: 3.0, roe: 18, name: 'Sabeco' },
-    'GVR': { pe: 25, pb: 2.5, roe: 10, name: 'Tập đoàn Cao su' },
-    'BCM': { pe: 25, pb: 3.5, roe: 15, name: 'Becamex IDC' },
-    'VJC': { pe: 20, pb: 3.0, roe: 10, name: 'Vietjet Air' }
+export const COMPANY_NAME_MAP: Record<string, string> = {
+    'ACB': 'Ngân hàng Á Châu', 'BCM': 'Bình Dương (Becamex)', 'BID': 'BIDV', 'BVH': 'Bảo hiểm Bảo Việt',
+    'CTG': 'VietinBank', 'FPT': 'FPT Corp', 'GAS': 'PV GAS', 'GVR': 'Cao su Việt Nam',
+    'HDB': 'HDBank', 'HPG': 'Hòa Phát', 'MBB': 'MBBank', 'MSN': 'Masan Group',
+    'MWG': 'Thế giới Di động', 'PLX': 'Petrolimex', 'POW': 'PV Power', 'SAB': 'Sabeco',
+    'SHB': 'SHB', 'SSB': 'SeABank', 'SSI': 'Chứng khoán SSI', 'STB': 'Sacombank',
+    'TCB': 'Techcombank', 'TPB': 'TPBank', 'VCB': 'Vietcombank', 'VHM': 'Vinhomes',
+    'VIB': 'VIBBank', 'VIC': 'Vingroup', 'VJC': 'Vietjet Air', 'VNM': 'Vinamilk',
+    'VPB': 'VPBank', 'VRE': 'Vincom Retail', 'DGC': 'Hóa chất Đức Giang', 'VCI': 'Chứng khoán Vietcap',
+    'VND': 'Chứng khoán VNDIRECT', 'FRT': 'Bán lẻ FPT (Long Châu)'
+};
+
+export const getSector = (symbol: string): string => SECTOR_MAP[symbol] || 'Khác';
+export const getCompanyName = (symbol: string): string => COMPANY_NAME_MAP[symbol] || symbol;
+
+export const VN30_BASE_RATIOS: Record<string, { pe: number, pb: number, roe: number, name?: string, eps?: number, bvps?: number }> = {
+    'VIB': { pe: 6.5, pb: 1.3, roe: 18, name: 'VIBBank', eps: 2900, bvps: 15500 },
+    'TCB': { pe: 7.5, pb: 1.2, roe: 16, name: 'Techcombank', eps: 3500, bvps: 22000 },
+    'MBB': { pe: 6.5, pb: 1.2, roe: 20, name: 'MBBank', eps: 3800, bvps: 18000 },
+    'ACB': { pe: 7.0, pb: 1.5, roe: 22, name: 'Ngân hàng Á Châu', eps: 3800, bvps: 17600 },
+    'CTG': { pe: 8.5, pb: 1.4, roe: 15, name: 'VietinBank', eps: 4200, bvps: 28000 },
+    'BID': { pe: 12, pb: 2.0, roe: 16, name: 'BIDV', eps: 4500, bvps: 32000 },
+    'VCB': { pe: 16, pb: 3.0, roe: 20, name: 'Vietcombank', eps: 5500, bvps: 35000 },
+    'STB': { pe: 9.0, pb: 1.2, roe: 18, name: 'Sacombank', eps: 2500, bvps: 16000 },
+    'TPB': { pe: 8.0, pb: 1.2, roe: 15, name: 'TPBank', eps: 2000, bvps: 15000 },
+    'VPB': { pe: 9.5, pb: 1.1, roe: 13, name: 'VPBank', eps: 1500, bvps: 18000 },
+    'HDB': { pe: 7.5, pb: 1.4, roe: 23, name: 'HDBank', eps: 3200, bvps: 18000 },
+    'LPB': { pe: 10, pb: 1.8, roe: 20, name: 'LPBank', eps: 3000, bvps: 18000 },
+    'FPT': { pe: 26, pb: 6.5, roe: 28, name: 'FPT Corp', eps: 5800, bvps: 22000 },
+    'HPG': { pe: 15, pb: 1.8, roe: 12, name: 'Hòa Phát', eps: 1800, bvps: 16000 },
+    'MWG': { pe: 25, pb: 2.8, roe: 12, name: 'Thế giới Di động', eps: 2500, bvps: 20000 },
+    'VNM': { pe: 17, pb: 4.8, roe: 28, name: 'Vinamilk', eps: 4200, bvps: 16000 },
+    'SSI': { pe: 20, pb: 2.0, roe: 12, name: 'Chứng khoán SSI', eps: 1500, bvps: 18000 },
+    'VHM': { pe: 6.5, pb: 1.0, roe: 15, name: 'Vinhomes', eps: 6500, bvps: 45000 },
+    'VIC': { pe: 30, pb: 1.8, roe: 5, name: 'Vingroup', eps: 2000, bvps: 35000 },
+    'VRE': { pe: 13, pb: 1.4, roe: 12, name: 'Vincom Retail', eps: 1800, bvps: 18000 },
+    'GAS': { pe: 17, pb: 2.8, roe: 16, name: 'PV GAS' },
+    'MSN': { pe: 22, pb: 3.8, roe: 18, name: 'Masan Group' },
+    'DGC': { pe: 13, pb: 3.5, roe: 35, name: 'Hóa chất Đức Giang' },
+    'VCI': { pe: 20, pb: 2.2, roe: 13, name: 'Chứng khoán Vietcap' },
+    'FRT': { pe: 50, pb: 6.0, roe: 10, name: 'Bán lẻ FPT (Long Châu)' },
+    'BVH': { pe: 13, pb: 1.2, roe: 10, name: 'Bảo Việt' },
+    'PLX': { pe: 15, pb: 1.8, roe: 14, name: 'Petrolimex' },
+    'POW': { pe: 16, pb: 0.9, roe: 6, name: 'PV Power' },
+    'SAB': { pe: 19, pb: 3.5, roe: 18, name: 'Sabeco' },
+    'GVR': { pe: 28, pb: 3.0, roe: 12, name: 'Tập đoàn Cao su' },
+    'BCM': { pe: 28, pb: 4.0, roe: 15, name: 'Becamex IDC' },
+    'VJC': { pe: 22, pb: 3.5, roe: 12, name: 'Vietjet Air' }
 };
 
 // ===================== CORE METHODS =====================
@@ -192,7 +207,8 @@ export function calculateMarginOfSafety(
 ): { margin: number; verdict: 'CHEAP' | 'FAIR' | 'EXPENSIVE' | 'N/A' } {
     if (intrinsicValue <= 0 || currentPrice <= 0) return { margin: 0, verdict: 'N/A' };
 
-    const margin = ((intrinsicValue - currentPrice) / intrinsicValue) * 100;
+    // Unified Margin Logic: (Intrinsic - Price) / Price = Upside Potential (%)
+    const margin = currentPrice > 0 ? ((intrinsicValue - currentPrice) / currentPrice) * 100 : 0;
     let cheapThreshold = 25;
     let fairThreshold = -10;
 
@@ -364,7 +380,7 @@ export function runFullValuation(
     const weightedAvg = totalWeight > 0 ? adjustedResults.reduce((sum, r) => sum + r.intrinsicValue * r.adjConfidence, 0) / totalWeight : 0;
     const overallMos = calculateMarginOfSafety(weightedAvg, input.currentPrice, sentimentScore);
 
-    let grade = 'C';
+    let grade: 'S' | 'A' | 'B' | 'C' = 'C';
     if (adjustedResults.length >= 2) {
         const values = adjustedResults.map(r => r.intrinsicValue);
         const avg = values.reduce((a, b) => a + b, 0) / values.length;
@@ -373,6 +389,8 @@ export function runFullValuation(
         else if (cv < 0.25) grade = 'A';
         else if (cv < 0.4) grade = 'B';
     }
+
+    const relativeTarget = calculateRelativeTarget(input);
 
     return {
         averageIntrinsic: Math.round(weightedAvg),
@@ -383,16 +401,102 @@ export function runFullValuation(
         marketSentimentScore: sentimentScore,
         convictionScore: Math.min(100, (grade === 'S' ? 95 : grade === 'A' ? 85 : 70) + (isBank || isGrowth ? 10 : 0)),
         convergenceGrade: grade,
-        sectorCalibration
+        sectorCalibration,
+        relativeTarget
     };
+}
+
+/**
+ * Calculates a relative valuation blend targeting short/mid term (3-12 months)
+ */
+export function calculateRelativeTarget(input: ValuationInput): number {
+    const isBank = input.industry === 'Ngân hàng' || input.industry?.includes('Bank');
+    const roe = input.roe;
+    const eps = input.eps;
+    const bvps = input.bvps;
+    
+    const industryPE = input.industryPE || 15;
+
+    // Method 1: P/B Blend
+    let fairPB = Math.max(1.2, roe / 10);
+    if (isBank) fairPB = Math.min(1.8, fairPB); 
+    const targetPB = bvps * fairPB;
+
+    // Method 2: P/E Blend
+    let targetPE_ratio = Math.max(8, Math.min(industryPE * 1.5, (industryPE + 15) / 2));
+    if (isBank) targetPE_ratio = Math.min(11, targetPE_ratio);
+    const targetPE = eps * targetPE_ratio;
+
+    // Method 3: PEG Blend (Estimated Growth from ROE)
+    const growth = Math.min(25, roe * 0.8);
+    const targetPEG = eps * growth * 1.0; // Fair PEG is 1.0
+
+    // Sector Weighting
+    let wPB = 0.33, wPE = 0.33, wPEG = 0.34;
+    if (isBank) {
+        wPB = 0.60; wPE = 0.30; wPEG = 0.10;
+    } else if (industryPE > 20 || roe > 25) {
+        wPB = 0.10; wPE = 0.45; wPEG = 0.45;
+    }
+
+    return (targetPB * wPB) + (targetPE * wPE) + (targetPEG * wPEG);
+}
+
+/**
+ * Unifies valuation logic for APIs that may not have full fundamental data
+ */
+export function runUnifiedValuation(
+    symbol: string,
+    currentPrice: number,
+    fundamentalInput?: Partial<ValuationInput>
+): ValuationSummary {
+    const symbolSector = getSector(symbol);
+    const base = VN30_BASE_RATIOS[symbol] || { pe: 12, pb: 1.5, roe: 15 };
+
+    // Fill in missing values using baseline ratios
+    const input: ValuationInput = {
+        currentPrice: currentPrice,
+        eps: fundamentalInput?.eps ?? base.eps ?? (currentPrice / base.pe),
+        pe: fundamentalInput?.pe ?? base.pe,
+        bvps: fundamentalInput?.bvps ?? base.bvps ?? (currentPrice / base.pb),
+        pb: fundamentalInput?.pb ?? base.pb,
+        roe: fundamentalInput?.roe ?? base.roe,
+        lastDividend: fundamentalInput?.lastDividend ?? 0,
+        dividendGrowth: fundamentalInput?.dividendGrowth ?? 0,
+        industryPE: fundamentalInput?.industryPE ?? base.pe,
+        dividendYield: fundamentalInput?.dividendYield ?? 0,
+        industry: fundamentalInput?.industry ?? symbolSector
+    };
+
+    return runFullValuation(input);
 }
 
 export function runSimpleValuation(
     symbol: string, currentPrice: number, eps: number, roe: number, bvps: number, industryPE: number = 15, lastDividend: number = 0
 ): ValuationSummary {
-    return runFullValuation({
-        currentPrice, eps, roe, bvps, pe: eps > 0 ? currentPrice / eps : 15, pb: bvps > 0 ? currentPrice / bvps : 1.5,
-        lastDividend, dividendGrowth: roe * 0.4, industryPE, dividendYield: lastDividend > 0 ? (lastDividend / currentPrice) * 100 : 0,
-        industry: SECTOR_MAP[symbol] || 'Khác'
-    }, { requiredReturn: 12, projectionYears: 10, marketSentimentScore: 50 });
+    return runUnifiedValuation(symbol, currentPrice, {
+        eps, roe, bvps, industryPE, lastDividend
+    });
 }
+
+export const TARGET_2026: Record<string, number> = {
+    'FPT': 200000,
+    'HPG': 40000,
+    'VCB': 120000,
+    'TCB': 65000,
+    'MBB': 35000,
+    'ACB': 42000,
+    'VIB': 30000,
+    'MSN': 110000,
+    'MWG': 95000,
+    'VNM': 92000,
+    'PNJ': 130000,
+    'DGC': 150000,
+    'STB': 45000,
+    'VHM': 72000,
+    'VIC': 68000
+};
+
+export const getTarget2026 = (symbol: string, currentPrice: number): number => {
+    return TARGET_2026[symbol] || Math.round(currentPrice * 1.5);
+};

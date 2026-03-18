@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { getWithCache } from '@/lib/cache';
-import { VN30_BASE_RATIOS, runSimpleValuation } from '@/lib/valuation-engine';
+import { VN30_BASE_RATIOS, runUnifiedValuation, getSector } from '@/lib/valuation-engine';
 import dividendsData from '@/data/dividends.json';
 
 // VN30 List (Full 30 stocks)
@@ -86,22 +86,6 @@ interface EnrichedStockData extends StockRealtimeData {
     consistencyScore: number;
     sector: string;
     stockDividendRatio: number;
-}
-
-// Helper to get sector (Mock mapping for now or from existing data)
-function getSector(symbol: string): string {
-    const sectorMap: Record<string, string> = {
-        'ACB': 'Ngân hàng', 'BID': 'Ngân hàng', 'CTG': 'Ngân hàng', 'HDB': 'Ngân hàng',
-        'MBB': 'Ngân hàng', 'SHB': 'Ngân hàng', 'SSB': 'Ngân hàng', 'STB': 'Ngân hàng',
-        'TCB': 'Ngân hàng', 'TPB': 'Ngân hàng', 'VCB': 'Ngân hàng', 'VIB': 'Ngân hàng',
-        'VPB': 'Ngân hàng', 'BVH': 'Bảo hiểm', 'SSI': 'Chứng khoán',
-        'FPT': 'Công nghệ', 'MWG': 'Bán lẻ', 'PNJ': 'Bán lẻ',
-        'GAS': 'Dầu khí', 'PLX': 'Dầu khí', 'POW': 'Điện',
-        'HPG': 'Thép', 'MSN': 'Tiêu dùng', 'SAB': 'Tiêu dùng', 'VNM': 'Tiêu dùng',
-        'BCM': 'Bất động sản', 'GVR': 'Cao su', 'VHM': 'Bất động sản',
-        'VIC': 'Bất động sản', 'VRE': 'Bất động sản', 'VJC': 'Hàng không', 'DGC': 'Hóa chất'
-    };
-    return sectorMap[symbol] || 'Khác';
 }
 
 export async function GET(request: NextRequest) {
@@ -261,25 +245,17 @@ export async function GET(request: NextRequest) {
             const inferredBVPS = currentPrice / baseData.pb;
             const inferredROE = baseData.roe;
 
-            const valuation = runSimpleValuation(
+            const valuation = runUnifiedValuation(
                 symbol,
                 currentPrice,
-                inferredEPS,
-                inferredROE,
-                inferredBVPS,
-                baseData.pe, // use its own PE as industryPE target for simplicity
-                dividendPerShare
+                {
+                    lastDividend: dividendPerShare,
+                    industry: sector
+                }
             );
 
             let intrinsicValue = valuation.averageIntrinsic;
             const consistencyScore = calculateConsistency(divInfo);
-
-            // Final Polish: If Long-Term/Short-Term Rec is "NẮM GIỮ" (Hold) hoặc "MUA" (Buy), ensure Margin >= -10% (Hợp lý)
-            // This fixes the contradiction reported by the user.
-            const isHoldOrBuy = consistencyScore >= 3 || dividendYield >= 3 || changePercent >= 1.5;
-            if (isHoldOrBuy && intrinsicValue < currentPrice * 0.95) {
-                intrinsicValue = currentPrice * 0.95; // Force at least a -5% margin ("Hợp lý")
-            }
 
             return {
                 symbol,
@@ -298,7 +274,9 @@ export async function GET(request: NextRequest) {
                 marketCap: currentPrice * 1000000,
                 consistencyScore,
                 stockDividendRatio,
-                intrinsicValue
+                intrinsicValue: intrinsicValue,
+                shortTermTarget: valuation.relativeTarget,
+                valuationSummary: valuation
             };
         });
 
@@ -319,7 +297,8 @@ export async function GET(request: NextRequest) {
             marketCap: Number(stock.marketCap || 0),
             consistencyScore: Number(stock.consistencyScore || 0),
             stockDividendRatio: Number(stock.stockDividendRatio || 0),
-            intrinsicValue: Number(stock.intrinsicValue || 0)
+            intrinsicValue: Number(stock.intrinsicValue || 0),
+            shortTermTarget: Number(stock.shortTermTarget || 0)
         }));
 
         // Calculate Sector Stats

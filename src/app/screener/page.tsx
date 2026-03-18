@@ -49,7 +49,8 @@ interface StockDividendData {
     sector: string;
     marketCap: number;
     consistencyScore: number;
-    intrinsicValue: number; // Added for Giá Nội Tại column
+    intrinsicValue: number; // Long-term intrinsic value
+    shortTermTarget: number; // Short-term relative target
 }
 
 interface DividendEvent {
@@ -817,6 +818,9 @@ export default function DividendScreenerPage() {
                                                         Giá Nội Tại <ArrowUpDown className={`w-3 h-3 ${sortField === 'intrinsicValue' ? 'text-indigo-400' : ''}`} />
                                                     </span>
                                                 </th>
+                                                <th className="p-3 text-right text-xs font-bold text-slate-400 uppercase">
+                                                    Mục tiêu
+                                                </th>
                                                 <th
                                                     className="p-3 text-center text-xs font-bold text-slate-400 uppercase cursor-pointer hover:text-white transition-colors"
                                                     onClick={() => handleSort('consistencyScore')}
@@ -889,7 +893,7 @@ export default function DividendScreenerPage() {
                                                             <div className="flex flex-col items-end">
                                                                 <span className="text-white font-bold">{(stock.intrinsicValue / 1000).toFixed(1)}K</span>
                                                                 {(() => {
-                                                                    const margin = (stock.intrinsicValue - stock.currentPrice) / stock.intrinsicValue * 100;
+                                                                    const margin = (stock.intrinsicValue - stock.currentPrice) / stock.currentPrice * 100;
                                                                     const isValid = stock.intrinsicValue > 0;
                                                                     if (!isValid) return <span className="text-[10px] text-slate-500">N/A</span>;
 
@@ -897,6 +901,14 @@ export default function DividendScreenerPage() {
                                                                     if (margin >= -10) return <span className="text-[10px] text-amber-400">Hợp lý</span>;
                                                                     return <span className="text-[10px] text-rose-400">Đắt</span>;
                                                                 })()}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-3 text-right font-mono">
+                                                            <div className="flex flex-col items-end">
+                                                                <span className="text-amber-400 font-bold">
+                                                                    {stock.shortTermTarget > 0 ? `${(stock.shortTermTarget / 1000).toFixed(1)}K` : 'N/A'}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-500">Kỳ vọng</span>
                                                             </div>
                                                         </td>
                                                         <td className="p-3">

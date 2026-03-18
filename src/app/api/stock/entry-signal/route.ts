@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
-import { runSimpleValuation, VN30_BASE_RATIOS } from '@/lib/valuation-engine';
+import { runUnifiedValuation, VN30_BASE_RATIOS } from '@/lib/valuation-engine';
 
 /**
  * Smart Entry Signal API
@@ -93,13 +93,9 @@ async function fetchIntrinsicValue(symbol: string, baseUrl: string): Promise<{ i
         // Fallback: If fundamentals API is slow/fails, use the simple engine locally with baseline ratios
         const base = VN30_BASE_RATIOS[symbol] || { pe: 12, pb: 1.5, roe: 15 };
         const mockPrice = 20000; // default if everything fails
-        const valuation = runSimpleValuation(
+        const valuation = runUnifiedValuation(
             symbol,
-            mockPrice,
-            mockPrice / base.pe,
-            base.roe,
-            mockPrice / base.pb,
-            base.pe
+            mockPrice
         );
         return { intrinsicValue: valuation.averageIntrinsic, currentPrice: mockPrice };
 

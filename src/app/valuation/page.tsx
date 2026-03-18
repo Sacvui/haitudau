@@ -836,6 +836,12 @@ function SummaryCard({ valuation, fundamentals }: { valuation: ValuationSummary;
                                 {valuation.averageIntrinsic > 0 ? `${(valuation.averageIntrinsic / 1000).toFixed(1)}k` : 'N/A'}
                             </p>
                         </div>
+                        <div className="text-center px-4 border-l border-white/5">
+                            <p className="text-[10px] text-amber-500/80 uppercase font-bold">Mục tiêu (3-12th)</p>
+                            <p className="text-xl font-bold text-white font-mono">
+                                {valuation.relativeTarget > 0 ? `${(valuation.relativeTarget / 1000).toFixed(1)}k` : 'N/A'}
+                            </p>
+                        </div>
                         <div className="text-center">
                             <p className="text-[10px] text-slate-500 uppercase font-bold">Biên an toàn</p>
                             <p className={`text-xl font-bold font-mono flex items-center gap-1 ${valuation.overallMargin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>

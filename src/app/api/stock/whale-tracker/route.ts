@@ -129,26 +129,18 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                     }
                 } catch (aiErr: any) {
                     console.error('AI Insight Error:', aiErr.message);
-                    aiInsight = `Lỗi kết nối AI: Vui lòng kiểm tra lại API Key hoặc bật 'Generative Language API'. Chi tiết: ${aiErr.message}`;
+                    aiInsight = `Lỗi kết nối AI: Vui lòng kiểm tra lại API Key. Chi tiết: ${aiErr.message}`;
                 }
             } else {
-                // Smart algorithmic fallback when no Gemini key
-                if (isVIB && !hasTrades) {
-                    aiInsight = "Dòng tiền ngoại đang tạm nghỉ sau chuỗi ngày mua ròng mạnh vùng 18.x. Tự doanh có dấu hiệu bắt đầu gom hàng âm thầm. Đây là giai đoạn tích lũy cạn kiệt vol, báo hiệu sắp có biến động mạnh phục vụ game thoái vốn.";
-                } else if (symbol === 'FPT' && !hasTrades) {
-                    aiInsight = "Dòng tiền ngoại đang xả ròng do lo ngại AI thay thế nhân sự IT truyền thống, đe dọa biên lợi nhuận mảng Forward. Tuy nhiên, FPT đang nỗ lực chuyển mình sang Chip & Bán dẫn để bù đắp. Cần theo dõi sát ngưỡng hỗ trợ và áp lực bán của 'Whale' trước khi giải ngân.";
-                } else if (symbol === 'FRT' && !hasTrades) {
-                    aiInsight = "Chuỗi Long Châu đang bước vào giai đoạn hái quả ngọt với biên lợi nhuận cải thiện mạnh. Dòng tiền thông minh đang gom hàng bền bỉ, kỳ vọng FRT trở thành đế chế Healthcare số 1 Việt Nam.";
-                } else if (symbol === 'VNM' && !hasTrades) {
-                    aiInsight = "Vinamilk đang trong giai đoạn tái định vị thương hiệu mạnh mẽ để trẻ hóa tệp khách hàng. Dòng tiền ngoại dù có rung lắc nhưng vẫn coi đây là 'safe haven' nhờ dòng tiền kinh doanh cực kỳ ổn định. Vùng 62-63 là vùng đệm giá an toàn cho mục tiêu 8x trong năm tới.";
-                } else if (hasTrades) {
+                // Smart algorithmic fallback when no Gemini key - Dynamic logic only
+                if (hasTrades) {
                     const recentTrend = recentNetValue > 0 ? 'mua ròng' : 'bán ròng';
                     const totalTrend = netValueTotal > 0 ? 'tích lũy' : 'phân phối';
                     const recentVND = Math.abs(recentNetValue / 1e9).toFixed(1);
                     const totalVND = Math.abs(netValueTotal / 1e9).toFixed(1);
                     const actionWord = recentNetValue > 0 ? 'GOM HÀNG' : 'THOÁT HÀNG';
                     
-                    aiInsight = `Khối ngoại đang ${actionWord} với giá trị ${recentTrend} ${recentVND} tỷ trong 5 phiên gần nhất. Tổng 30 phiên: ${totalTrend} ${totalVND} tỷ. Đây là tín hiệu ${recentNetValue > 0 ? 'tích cực cho thấy dòng tiền ngoại đang quay trở lại' : 'thận trọng cần theo dõi áp lực cung từ Whale'}.`;
+                    aiInsight = `Khối ngoại đang ${actionWord} với giá trị ${recentTrend} ${recentVND} tỷ trong 5 phiên gần nhất. Tổng 60 phiên: ${totalTrend} ${totalVND} tỷ. Đây là tín hiệu ${recentNetValue > 0 ? 'tích cực cho thấy dòng tiền ngoại đang quay trở lại' : 'thận trọng cần theo dõi áp lực cung từ Whale'}.`;
                 } else if (priceHistory.length > 0) {
                     const latest = priceHistory[0]; // priceHistory is sorted by date desc
                     const prev = priceHistory.length > 5 ? priceHistory[5] : priceHistory[priceHistory.length - 1];
@@ -206,7 +198,9 @@ Trả lời trực tiếp bằng tiếng Việt, không chào gọi.`;
                 action,
                 aiInsight,
                 isLive: hasTrades,
-                latestPrice: priceHistory.length > 0 ? Number(priceHistory[0].close) : 0,
+                latestPrice: priceHistory.length > 0 
+                    ? Number(priceHistory[0].close) 
+                    : (hasTrades ? Number(trades[0].close) : 0),
                 history: hasTrades ? trades.slice(0, 10) : []
             };
         }, 15 * 60 * 1000); // 15 minutes cache for AI enhanced results

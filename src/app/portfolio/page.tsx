@@ -11,6 +11,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createBrowserClient } from '@supabase/ssr';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { T0Assistant } from '@/components/dashboard/T0Assistant';
+import { calculateT0Signal, T0Signal } from '@/lib/t0-logic';
+import { fetchRealtimeQuote } from '@/lib/stock-api';
 
 interface PortfolioItem {
     id: string;
@@ -68,7 +71,9 @@ export default function PrivatePortfolioPage() {
     // Data State (Holdings)
     const [items, setItems] = useState<PortfolioItem[]>([]);
     const [prices, setPrices] = useState<Record<string, number>>({});
+    const [t0Signals, setT0Signals] = useState<T0Signal[]>([]);
     const [loading, setLoading] = useState(false);
+    const [t0Loading, setT0Loading] = useState(false);
 
     // Data State (History)
     const [analyses, setAnalyses] = useState<SavedAnalysis[]>([]);
@@ -142,7 +147,7 @@ export default function PrivatePortfolioPage() {
                 // Fetch prices for these symbols
                 const symbols = [...new Set(result.data.map((i: any) => i.symbol))];
                 if (symbols.length > 0) {
-                    fetchPrices(symbols as string[]);
+                    fetchPrices(symbols as string[], result.data);
                 }
             }
         } catch (e) {
@@ -152,11 +157,7 @@ export default function PrivatePortfolioPage() {
         }
     };
 
-    const fetchPrices = async (symbols: string[]) => {
-        // Reuse screener API or history API logic. Here we create ad-hoc fetch
-        // For MVP, we can reuse /api/stock/screener if it supports query? 
-        // Actually /api/stock/screener fetches all VN30. 
-        // Let's assume we can use the realtime API we built.
+    const fetchPrices = async (symbols: string[], currentItems?: PortfolioItem[]) => {
         try {
             const res = await fetch('/api/stock/screener');
             const result = await res.json();
@@ -167,8 +168,43 @@ export default function PrivatePortfolioPage() {
                 });
                 setPrices(priceMap);
             }
+            
+            // Also fetch full quotes for T0 signals
+            fetchT0Signals(symbols, currentItems || items);
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    const fetchT0Signals = async (symbols: string[], portfolioItems: PortfolioItem[]) => {
+        if (symbols.length === 0) return;
+        setT0Loading(true);
+        try {
+            const signals: T0Signal[] = [];
+            for (const symbol of symbols) {
+                const quote = await fetchRealtimeQuote(symbol);
+                if (quote && quote.high > 0) {
+                    // Find average cost for this symbol
+                    const symbolItems = portfolioItems.filter(i => i.symbol === symbol);
+                    const totalShares = symbolItems.reduce((sum, i) => sum + i.shares, 0);
+                    const avgCost = totalShares > 0 
+                        ? symbolItems.reduce((sum, i) => sum + (i.shares * i.avgPrice), 0) / totalShares 
+                        : 0;
+
+                    const signal = calculateT0Signal(symbol, {
+                        high: quote.high,
+                        low: quote.low,
+                        current: quote.price,
+                        open: quote.open
+                    }, avgCost);
+                    signals.push(signal);
+                }
+            }
+            setT0Signals(signals);
+        } catch (e) {
+            console.error('Error fetching T0 signals:', e);
+        } finally {
+            setT0Loading(false);
         }
     };
 
@@ -345,6 +381,9 @@ export default function PrivatePortfolioPage() {
                         </div>
                     </GlassCard>
                 </div>
+
+                {/* T0 Assistant Section */}
+                <T0Assistant signals={t0Signals} loading={t0Loading} />
 
                 {/* Add Form */}
                 {isAdding && (

@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { SettingsDialog } from './SettingsDialog';
+import ApiKeySettings from './ApiKeySettings';
 
 interface SidebarProps {
     className?: string;
@@ -60,6 +62,7 @@ export function Sidebar({ className }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const [user, setUser] = useState<{ username: string, displayName?: string, role?: string } | null>(null);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     useEffect(() => {
         fetch('/api/auth/me').then(r => r.json()).then(data => {
@@ -144,11 +147,21 @@ export function Sidebar({ className }: SidebarProps) {
                             Quản Lý User
                         </Link>
                     )}
-                    <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/40 transition-all duration-200">
+                    <button 
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/40 transition-all duration-200"
+                    >
                         <Settings className="w-5 h-5 text-slate-500" />
                         Cài đặt
                     </button>
+
+                    {/* Quick AI Toggle/Status */}
+                    <div className="px-4 py-2 mt-2">
+                        <ApiKeySettings />
+                    </div>
                 </div>
+
+                <SettingsDialog isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
             </div>
 
             {/* 3. USER PROFILE */}

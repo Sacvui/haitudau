@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { getWithCache } from '@/lib/cache';
-import { VN30_BASE_RATIOS, runFullValuation, SECTOR_MAP } from '@/lib/valuation-engine';
+import { fetchRealtimePrice } from '@/lib/stock-api';
+import { VN30_BASE_RATIOS, runFullValuation, runUnifiedValuation, SECTOR_MAP, COMPANY_NAME_MAP } from '@/lib/valuation-engine';
 
 interface FundamentalsData {
     symbol: string;
@@ -29,42 +30,7 @@ interface FundamentalsData {
     historicalReturn5Y: number;// 5 Year Stock return CAGR (%)
 }
 
-const STOCK_METADATA: Record<string, { name: string, industry: string }> = {
-    'ACB': { name: 'Ngân hàng Á Châu', industry: 'Ngân hàng' },
-    'BCM': { name: 'Bình Dương (Becamex)', industry: 'Bất động sản' },
-    'BID': { name: 'BIDV', industry: 'Ngân hàng' },
-    'BVH': { name: 'Bảo hiểm Bảo Việt', industry: 'Bảo hiểm' },
-    'CTG': { name: 'VietinBank', industry: 'Ngân hàng' },
-    'FPT': { name: 'FPT Corp', industry: 'Công nghệ' },
-    'GAS': { name: 'PV GAS', industry: 'Dầu khí' },
-    'GVR': { name: 'Cao su Việt Nam', industry: 'Cao su' },
-    'HDB': { name: 'HDBank', industry: 'Ngân hàng' },
-    'HPG': { name: 'Hòa Phát', industry: 'Thép' },
-    'MBB': { name: 'MBBank', industry: 'Ngân hàng' },
-    'MSN': { name: 'Masan Group', industry: 'Tiêu dùng' },
-    'MWG': { name: 'Thế giới Di động', industry: 'Bán lẻ' },
-    'PLX': { name: 'Petrolimex', industry: 'Dầu khí' },
-    'POW': { name: 'PV Power', industry: 'Điện' },
-    'SAB': { name: 'Sabeco', industry: 'Tiêu dùng' },
-    'SHB': { name: 'SHB', industry: 'Ngân hàng' },
-    'SSB': { name: 'SeABank', industry: 'Ngân hàng' },
-    'SSI': { name: 'Chứng khoán SSI', industry: 'Chứng khoán' },
-    'STB': { name: 'Sacombank', industry: 'Ngân hàng' },
-    'TCB': { name: 'Techcombank', industry: 'Ngân hàng' },
-    'TPB': { name: 'TPBank', industry: 'Ngân hàng' },
-    'VCB': { name: 'Vietcombank', industry: 'Ngân hàng' },
-    'VHM': { name: 'Vinhomes', industry: 'Bất động sản' },
-    'VIB': { name: 'VIBBank', industry: 'Ngân hàng' },
-    'VIC': { name: 'Vingroup', industry: 'Bất động sản' },
-    'VJC': { name: 'Vietjet Air', industry: 'Hàng không' },
-    'VNM': { name: 'Vinamilk', industry: 'Tiêu dùng' },
-    'VPB': { name: 'VPBank', industry: 'Ngân hàng' },
-    'VRE': { name: 'Vincom Retail', industry: 'Bất động sản' },
-    'DGC': { name: 'Hóa chất Đức Giang', industry: 'Hóa chất' },
-    'VCI': { name: 'Chứng khoán Vietcap', industry: 'Chứng khoán' },
-    'VND': { name: 'Chứng khoán VNDIRECT', industry: 'Chứng khoán' },
-    'FRT': { name: 'Bán lẻ FPT (Long Châu)', industry: 'Bán lẻ' },
-};
+// No local metadata needed anymore
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -84,9 +50,8 @@ export async function GET(request: NextRequest) {
             const toTs = Math.floor(Date.now() / 1000);
             const fromTs = toTs - 7 * 24 * 60 * 60; // 7 days ago
 
-            const metadata = STOCK_METADATA[symbol] || { name: symbol, industry: 'N/A' };
-            let companyName = metadata.name;
-            let industry = metadata.industry;
+            let companyName = COMPANY_NAME_MAP[symbol] || symbol;
+            let industry = SECTOR_MAP[symbol] || 'N/A';
             let marketCap = 25000000;
             let industryPE = 15;
             if (symbol === 'FPT') industryPE = 22;
@@ -97,11 +62,10 @@ export async function GET(request: NextRequest) {
             let currentPrice = 0;
 
             // Fetch all external data in parallel for maximum performance
-            const [pResResult, cafefResResult, histResResult] = await Promise.allSettled([
-                axios.get(`https://api.simplize.vn/api/historical/quote/${symbol}`, {
-                    headers: { 'User-Agent': 'Mozilla/5.0' },
-                    timeout: 5000
-                }),
+            currentPrice = await fetchRealtimePrice(symbol);
+
+            // Fetch Additional Data (Cafef for fundamentals, iBoard for history)
+            const [cafefResResult, histResResult] = await Promise.allSettled([
                 axios.get(`https://s.cafef.vn/hose/${symbol}-cong-ty.chn`, {
                     headers: { 'User-Agent': 'Mozilla/5.0' },
                     timeout: 8000
@@ -117,21 +81,6 @@ export async function GET(request: NextRequest) {
                     timeout: 5000
                 })
             ]);
-
-            // Process Price Data
-            if (pResResult.status === 'fulfilled' && pResResult.value.data?.status === 200) {
-                currentPrice = pResResult.value.data.data?.priceClose || 0;
-            }
-
-            // Ultimate fallback if Simplize also fails or it's an obscure ticker
-            if (currentPrice === 0) {
-                const MOCK_PRICES: Record<string, number> = {
-                    'FPT': 92000,
-                    'VNM': 68500,
-                    'VCB': 92000,
-                };
-                currentPrice = MOCK_PRICES[symbol] || (20000 + Math.random() * 80000);
-            }
 
             let eps = 0, pe = 0, bvps = 0, pb = 0, roe = 0;
             let dividendYield = 0, lastDividend = 0, dividendGrowth5Y = 0;
@@ -249,17 +198,13 @@ export async function GET(request: NextRequest) {
             if (planCompletion === 0) planCompletion = profitGrowth > 10 ? 105 : profitGrowth > 0 ? 95 : 80;
 
             // --- RUN UNIFIED VALUATION ENGINE ---
-            const valuation = runFullValuation({
-                currentPrice,
-                eps,
-                pe,
-                bvps,
-                pb,
-                roe,
+            const valuation = runUnifiedValuation(symbol, currentPrice, {
+                eps: eps > 0 ? eps : undefined,
+                pe: pe > 0 ? pe : undefined,
+                bvps: bvps > 0 ? bvps : undefined,
+                pb: pb > 0 ? pb : undefined,
+                roe: roe > 0 ? roe : undefined,
                 lastDividend,
-                dividendGrowth: roe * 0.4, // Inferred
-                industryPE,
-                dividendYield,
                 industry: SECTOR_MAP[symbol] || industry
             });
 
@@ -279,7 +224,7 @@ export async function GET(request: NextRequest) {
                 revenue,
                 netIncome,
                 industry: SECTOR_MAP[symbol] || industry,
-                companyName,
+                companyName: COMPANY_NAME_MAP[symbol] || companyName,
                 debtToEquity,
                 currentRatio,
                 profitGrowth,

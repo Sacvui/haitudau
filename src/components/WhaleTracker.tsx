@@ -61,8 +61,13 @@ export default function WhaleTracker({ initialSymbol = 'VIB', valuationVerdict }
     };
 
     const formatVND = (value: number) => {
-        const billion = value / 1000000000;
-        return `${billion.toFixed(2)} tỷ`;
+        const absValue = Math.abs(value);
+        if (absValue >= 1000000000) {
+            return `${(value / 1000000000).toFixed(2)} tỷ`;
+        } else if (absValue >= 1000000) {
+            return `${(value / 1000000).toFixed(1)} triệu`;
+        }
+        return `${value.toLocaleString('vi-VN')} đ`;
     };
 
     return (
@@ -148,27 +153,18 @@ export default function WhaleTracker({ initialSymbol = 'VIB', valuationVerdict }
                                     <span className="text-[10px] font-bold text-slate-500 uppercase">Phóng chiếu 2026</span>
                                 </div>
                                 <p className="text-lg font-black text-white uppercase tracking-tight">
-                                    {data.symbol === 'VIB' ? '28.x - 30.x' : 
-                                     data.symbol === 'FPT' ? '180.x - 210.x' : 
-                                     data.symbol === 'FRT' ? '220.x - 250.x' : 
-                                     data.symbol === 'VNM' ? '85.x - 92.x' :
-                                     data.symbol === 'TCB' ? '68.x - 75.x' :
-                                     data.symbol === 'MBB' ? '35.x - 40.x' :
-                                     data.symbol === 'ACB' ? '38.x - 42.x' :
-                                     data.symbol === 'VCB' ? '125.x - 145.x' :
-                                     data.symbol === 'MWG' ? '90.x - 110.x' :
-                                     data.symbol === 'HPG' ? '42.x - 48.x' :
-                                     data.symbol === 'MSN' ? '105.x - 120.x' :
-                                     data.symbol === 'SSI' ? '48.x - 55.x' :
-                                     (() => {
+                                    {(() => {
+                                        const { getTarget2026 } = require('@/lib/valuation-engine');
                                         const currentPrice = data.latestPrice || 0;
                                         if (currentPrice > 0) {
-                                            const low = Math.round((currentPrice * 1.25) / 100) / 10;
-                                            const high = Math.round((currentPrice * 1.55) / 100) / 10;
-                                            return `${low.toFixed(1)}x - ${high.toFixed(1)}x`;
+                                            const target = getTarget2026(data.symbol, currentPrice);
+                                            // Show a range +/- 5% around the fixed target for better "projection" feel
+                                            const low = (target * 0.95 / 1000).toFixed(1);
+                                            const high = (target * 1.05 / 1000).toFixed(1);
+                                            return `${low}k - ${high}k`;
                                         }
                                         return valuationVerdict === 'CHEAP' ? 'HỒI PHỤC' : 'TĂNG TRƯỞNG';
-                                     })()}
+                                    })()}
                                 </p>
                             </div>
                         </div>

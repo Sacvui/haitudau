@@ -44,51 +44,47 @@ export async function fetchStockHistory(params: StockHistoryParams): Promise<Sto
 export async function fetchForeignTrades(symbol: string): Promise<any[]> {
     try {
         const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
+        const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
         
         const toDate = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
-        const fromDate = `${thirtyDaysAgo.getDate().toString().padStart(2, '0')}/${(thirtyDaysAgo.getMonth() + 1).toString().padStart(2, '0')}/${thirtyDaysAgo.getFullYear()}`;
+        const fromDate = `${sixtyDaysAgo.getDate().toString().padStart(2, '0')}/${(sixtyDaysAgo.getMonth() + 1).toString().padStart(2, '0')}/${sixtyDaysAgo.getFullYear()}`;
 
-        console.log(`[stock-api] Fetching foreign trades for ${symbol} (${fromDate} to ${toDate}) from SSI Statistics...`);
+        console.log(`[stock-api] Fetching foreign trades for ${symbol} (${fromDate} to ${toDate})`);
         
+        // 1. Primary: SSI Statistics API
         try {
-            // New Robust SSI Endpoint uncovered by exploration
             const response = await axios.get(`https://iboard-api.ssi.com.vn/statistics/company/ssmi/stock-info`, {
                 params: {
                     symbol,
                     fromDate,
                     toDate,
                     page: 1,
-                    pageSize: 50
+                    pageSize: 100
                 },
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Referer': 'https://iboard.ssi.com.vn/',
-                    'Origin': 'https://iboard.ssi.com.vn',
-                    'device-id': '530C8E53-D902-46B4-9ACC-406F881AFBDD', // Simulated device ID for session
-                    'Accept': 'application/json, text/plain, */*'
+                    'Accept': 'application/json'
                 },
-                timeout: 8000
+                timeout: 10000
             });
 
-            if (response.data && response.data.data && response.data.data.length > 0) {
+            if (response.data && response.data.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
                 return response.data.data.map((item: any) => {
-                    // Use netBuySellVal/Vol directly if available (most reliable for SSI)
+                    const closePrice = Number(item.close) || 0;
                     const netVal = Number(item.netBuySellVal);
-                    const netVol = Number(item.netBuySellVol);
-                    
                     const buyVol = Number(item.foreignBuyVolTotal) || 0;
                     const sellVol = Number(item.foreignSellVolTotal) || 0;
                     
-                    // Fallback to volumes if values are missing
                     return {
                         date: item.tradingDate,
                         buyVolume: buyVol,
                         sellVolume: sellVol,
-                        buyValue: 0, // We usually only care about net for the UI
-                        sellValue: 0,
-                        netVolume: !isNaN(netVol) ? netVol : (buyVol - sellVol),
-                        netValue: !isNaN(netVal) ? netVal : 0,
+                        buyValue: Number(item.foreignBuyValTotal) || (buyVol * closePrice),
+                        sellValue: Number(item.foreignSellValTotal) || (sellVol * closePrice),
+                        netVolume: buyVol - sellVol,
+                        netValue: !isNaN(netVal) ? netVal : (buyVol - sellVol) * closePrice,
+                        close: closePrice,
                     };
                 });
             }
@@ -96,21 +92,20 @@ export async function fetchForeignTrades(symbol: string): Promise<any[]> {
             console.warn(`[stock-api] SSI Statistics API failed:`, ssiErr.message);
         }
 
-        // Secondary Fallback: VNDirect (Legacy mapping)
-        console.log(`[stock-api] SSI failing, trying VNDirect fallback for ${symbol}...`);
+        // 2. Secondary: VNDirect Fallback
         try {
-            const startDateVND = `${thirtyDaysAgo.getFullYear()}-${(thirtyDaysAgo.getMonth() + 1).toString().padStart(2, '0')}-${thirtyDaysAgo.getDate().toString().padStart(2, '0')}`;
+            const startDateVND = `${sixtyDaysAgo.getFullYear()}-${(sixtyDaysAgo.getMonth() + 1).toString().padStart(2, '0')}-${sixtyDaysAgo.getDate().toString().padStart(2, '0')}`;
             const vndRes = await axios.get(VNDIRECT_FOREIGN_API, {
                 params: {
                     sort: 'date',
                     q: `code:${symbol}~date:gte:${startDateVND}`,
-                    size: 50,
+                    size: 100,
                     page: 1,
                 },
                 headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.vndirect.com.vn/' },
-                timeout: 5000
+                timeout: 8000
             });
-            if (vndRes.data && vndRes.data.data) {
+            if (vndRes.data && vndRes.data.data && Array.isArray(vndRes.data.data) && vndRes.data.data.length > 0) {
                 return vndRes.data.data.map((item: any) => ({
                     date: item.date,
                     buyVolume: Number(item.nmBuyVol) || 0,
@@ -119,10 +114,38 @@ export async function fetchForeignTrades(symbol: string): Promise<any[]> {
                     sellValue: Number(item.nmSellVal) || 0,
                     netVolume: (Number(item.nmBuyVol) || 0) - (Number(item.nmSellVol) || 0),
                     netValue: (Number(item.nmBuyVal) || 0) - (Number(item.nmSellVal) || 0),
+                    close: Number(item.close) || 0
                 }));
             }
         } catch (vndErr: any) {
             console.warn(`[stock-api] VNDirect fallback failed:`, vndErr.message);
+        }
+
+        // 3. Last Resort: SSI Live Quote API (Ensure VIB always shows numbers)
+        try {
+             const quoteRes = await axios.get(`https://iboard-api.ssi.com.vn/statistics/api/v1/stock/quote`, {
+                 params: { symbol },
+                 headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://iboard.ssi.com.vn/' }
+             });
+             if (quoteRes.data && quoteRes.data.data) {
+                 const q = quoteRes.data.data;
+                 const buyVol = Number(q.foreignBuyVol) || 0;
+                 const sellVol = Number(q.foreignSellVol) || 0;
+                 if (buyVol > 0 || sellVol > 0) {
+                     return [{
+                         date: now.toLocaleDateString('vi-VN'),
+                         buyVolume: buyVol,
+                         sellVolume: sellVol,
+                         buyValue: buyVol * (Number(q.priceClose) || 0),
+                         sellValue: sellVol * (Number(q.priceClose) || 0),
+                         netVolume: buyVol - sellVol,
+                         netValue: (buyVol - sellVol) * (Number(q.priceClose) || 0),
+                         close: Number(q.priceClose) || 0
+                     }];
+                 }
+             }
+        } catch (quoteErr) {
+            console.warn(`[stock-api] SSI Quote fallback failed`);
         }
 
         return [];
@@ -154,6 +177,60 @@ export async function fetchDividendHistory(symbol: string): Promise<DividendInfo
     } catch (error) {
         console.error('Error fetching dividend history:', error);
         return [];
+    }
+}
+
+// Fetch real-time price for a single symbol
+export async function fetchRealtimeQuote(symbol: string): Promise<any> {
+    try {
+        // Try SSI iBoard Statistics as primary (very fast for VN30)
+        const response = await axios.get(`https://iboard-api.ssi.com.vn/statistics/api/v1/stock/quote`, {
+            params: { symbol },
+            headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://iboard.ssi.com.vn/' },
+            timeout: 5000
+        });
+
+        if (response.data && response.data.data) {
+            const q = response.data.data;
+            return {
+                symbol: q.symbol,
+                price: Number(q.priceClose) || 0,
+                high: Number(q.priceHigh) || 0,
+                low: Number(q.priceLow) || 0,
+                open: Number(q.priceOpen) || 0,
+                change: Number(q.change) || 0,
+                pctChange: Number(q.pctChange) || 0
+            };
+        }
+
+        return null;
+    } catch (error) {
+        console.error(`Error fetching realtime quote for ${symbol}:`, error);
+        return null;
+    }
+}
+
+// Fetch batch quotes (useful for Screener)
+export async function fetchLiveQuotes(symbols: string[]): Promise<Record<string, number>> {
+    try {
+        // FinanceID batch API
+        const response = await axios.get('https://financeid.vn/api/v2/market/trading-all', {
+            params: { exchange: 'HOSE' },
+            timeout: 10000
+        });
+
+        const quotes: Record<string, number> = {};
+        if (response.data && Array.isArray(response.data)) {
+            response.data.forEach((item: any) => {
+                if (symbols.includes(item.symbol)) {
+                    quotes[item.symbol] = Number(item.price) || 0;
+                }
+            });
+        }
+        return quotes;
+    } catch (error) {
+        console.error('Error fetching batch quotes:', error);
+        return {};
     }
 }
 
